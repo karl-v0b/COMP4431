@@ -24,19 +24,16 @@ Vector store: LangChain **InMemoryVectorStore** (server lifetime). Chroma was no
 - Python 3.10+ (tested on 3.15)
 - [Ollama](https://ollama.com) installed and running locally
 
-## Setup (one-time; internet only to download models)
+## Setup / Run
 
-```bash
-ollama pull qwen2.5:3b
-ollama pull nomic-embed-text
-ollama pull moondream
+`python run.py` **checks prerequisites on startup** and tries to fix them when possible:
 
-pip install -r requirements.txt
-```
+- Python 3.10+
+- pip packages from `requirements.txt` (auto `pip install` if missing)
+- Ollama running on `127.0.0.1:11434` (tries to start / `winget`/`brew` install when available)
+- Models: `qwen2.5:3b`, `nomic-embed-text`, `moondream` (auto `ollama pull` if missing)
 
-After models are downloaded, the app can run **offline**.
-
-## Run (local only)
+Internet is only needed the first time packages/models are downloaded. After that, the app can run **offline**.
 
 ```bash
 python run.py
@@ -44,11 +41,18 @@ python run.py
 
 Opens **`http://127.0.0.1:8000/`**.
 
+Useful flags:
+
 ```bash
 python run.py --no-browser
+python run.py --check-only          # check/fix only, do not start server
+python run.py --no-auto-fix      # report missing items without installing
+python run.py --skip-setup          # start immediately (advanced)
 ```
 
 or `run.bat`.
+
+If Ollama cannot be installed automatically, install from https://ollama.com/download, start the app, then re-run `python run.py`.
 
 ### Useful APIs
 
@@ -80,8 +84,6 @@ or `run.bat`.
 3. Ask “What does this PDF say about …?” or “What does the figure on page N show?”
 4. Switch to Traditional Chinese and re-ask.
 5. Clear PDF or stop the server to drop the PDF index.
-
-No PDF is loaded by default.
 
 ## Project layout
 
