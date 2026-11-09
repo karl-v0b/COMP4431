@@ -76,7 +76,6 @@ async def chat(messages: list[dict[str, str]], model: str | None = None) -> str:
             "content": (
                 "Your previous reply was incomplete or only punctuation. "
                 "Please answer again fully, with complete sentences and real content. "
-                "If Traditional Chinese was requested, write the full answer in 繁體中文."
             ),
         },
     ]

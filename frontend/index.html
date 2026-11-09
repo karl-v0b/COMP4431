@@ -10,10 +10,22 @@
     <main class="app">
       <header class="header">
         <h1>AI Tutor</h1>
-        <p id="status" class="status">Checking local model…</p>
+        <p id="status" class="status" hidden></p>
       </header>
 
       <section id="messages" class="messages" aria-live="polite"></section>
+
+      <section class="docs" aria-label="PDF references">
+        <div class="docs-row">
+          <label class="upload-label">
+            Upload PDF
+            <input id="pdf-input" type="file" accept="application/pdf,.pdf" hidden />
+          </label>
+          <button id="clear-docs" type="button">Clear PDF</button>
+        </div>
+        <p id="ingest-status" class="ingest-status"></p>
+        <ul id="doc-list" class="doc-list"></ul>
+      </section>
 
       <form id="chat-form" class="composer">
         <textarea

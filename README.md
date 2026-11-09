@@ -2,86 +2,86 @@
 
 Local, offline AI course tutor chatbot. No cloud API keys. Runs on your machine via Ollama + a small FastAPI app.
 
+## Features
+
+- Domain AI/CS tutoring in English or Chinese
+- Markdown tutor replies + Copy button
+- **PDF upload RAG (additional feature):** upload lecture PDFs; the tutor answers using retrieved text, tables, and short captions of figures/graphs. Indexed documents live **until the server process stops**.
+
 ## Hardware note
 
-Default model: **`qwen2.5:3b`** (~1.9GB)
+| Role | Model | Why |
+| --- | --- | --- |
+| Chat | `qwen2.5:3b` | Fits ~16GB RAM + iGPU; good English + Chinese |
+| Embeddings | `nomic-embed-text` | Local RAG embeddings |
+| Figure captions | `moondream` | Small local vision model; captions images once at upload |
 
-Chosen for typical student laptops with **~16GB RAM and integrated graphics**, and for reliable **English + Traditional Chinese** replies. Ollama will usually run on CPU. Larger 7B/8B models are not the project default.
-
-`llama3.2:3b` is kept as an optional English-leaning alternative, but it often fails on Traditional Chinese (short/empty replies like `.`).
-
-```text
-ollama pull qwen2.5:3b
-```
+Vector store: LangChain **InMemoryVectorStore** (server lifetime). Chroma was not used because `onnxruntime` has no Python 3.15 wheel on this setup; behavior still matches “until server shut down.”
 
 ## Requirements
 
 - Windows / macOS / Linux
-- Python 3.10+
+- Python 3.10+ (tested on 3.15)
 - [Ollama](https://ollama.com) installed and running locally
 
-## Setup (one-time; needs internet only to download the model)
-
-1. Install Ollama and start it.
-2. Pull the model:
+## Setup (one-time; internet only to download models)
 
 ```bash
 ollama pull qwen2.5:3b
-```
+ollama pull nomic-embed-text
+ollama pull moondream
 
-3. Install Python dependencies from the project root:
-
-```bash
 pip install -r requirements.txt
 ```
 
-After the model is downloaded, the app can run **offline**.
+After models are downloaded, the app can run **offline**.
 
 ## Run (local only)
-
-From the project root:
 
 ```bash
 python run.py
 ```
 
-This starts the app on **`http://127.0.0.1:8000/`** and opens a browser.
-
-To skip opening a browser:
+Opens **`http://127.0.0.1:8000/`**.
 
 ```bash
 python run.py --no-browser
 ```
 
-Windows shortcut:
+or `run.bat`.
 
-```bash
-run.bat
-```
+### Useful APIs
 
-### Useful checks
-
-- Health: `http://127.0.0.1:8000/api/health`
-- Chat API: `POST http://127.0.0.1:8000/api/chat` with JSON `{"message":"...","history":[]}`
+- `GET /api/health`
+- `POST /api/chat` — `{"message":"...","history":[]}`
+- `POST /api/upload` — multipart PDF field `file`
+- `GET /api/documents`
+- `DELETE /api/documents` — clear indexed PDFs for this server run
 
 ### Environment variables (optional)
 
-| Variable       | Default                     | Meaning              |
-| -------------- | --------------------------- | -------------------- |
-| `OLLAMA_MODEL` | `qwen2.5:3b`                | Model name in Ollama |
-| `OLLAMA_HOST`  | `http://127.0.0.1:11434`    | Local Ollama URL     |
-| `OLLAMA_TIMEOUT` | `180`                     | Chat timeout (seconds) |
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `OLLAMA_MODEL` | `qwen2.5:3b` | Chat model |
+| `OLLAMA_EMBED_MODEL` | `nomic-embed-text` | Embedding model |
+| `OLLAMA_VISION_MODEL` | `moondream` | Figure caption model |
+| `OLLAMA_HOST` | `http://127.0.0.1:11434` | Local Ollama |
+| `OLLAMA_TIMEOUT` | `180` | Chat timeout (seconds) |
+| `RAG_MAX_FILE_BYTES` | `20971520` | Max PDF size (~20MB) |
+| `RAG_MAX_PAGES` | `30` | Max pages per PDF |
+| `RAG_MAX_DOCUMENTS` | `3` | Max active PDFs |
+| `RAG_MAX_FIGURES` | `20` | Max figures captioned per PDF |
+| `RAG_RETRIEVE_K` | `4` | Chunks retrieved per question |
 
 ## Demo tips
 
-Example questions:
+1. Ask a normal AI question (no PDF).
+2. Upload a lecture PDF → wait until status shows indexed chunks.
+3. Ask “What does this PDF say about …?” or “What does the figure on page N show?”
+4. Switch to Traditional Chinese and re-ask.
+5. Clear PDF or stop the server to drop the PDF index.
 
-1. What is a heuristic in informed search?
-2. Can you use Traditional Chinese for responding my question in the chat?
-3. 什麼是啟發式搜尋？
-4. Off-topic: What’s the weather? (should redirect to course topics)
-
-Each tutor reply has a **Copy** button for the plain-text/markdown content.
+No PDF is loaded by default.
 
 ## Project layout
 
@@ -95,11 +95,15 @@ COMP4431/
     main.py
     ollama_client.py
     prompts/tutor_system.txt
+    rag/
+      config.py
+      store.py
+      ingest.py
+      retrieve.py
+      caption.py
   frontend/
     index.html
     styles.css
     app.js
-    marked.min.js   # local markdown renderer (offline)
+    marked.min.js
 ```
-
-Tutor replies are rendered as Markdown in the chat window (headings, lists, code, bold/italic). User messages stay plain text.
