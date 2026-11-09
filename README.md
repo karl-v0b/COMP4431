@@ -4,15 +4,14 @@ Local, offline AI course tutor chatbot. No cloud API keys. Runs on your machine 
 
 ## Hardware note
 
-Default model: **`llama3.2:3b`**
+Default model: **`qwen2.5:3b`** (~1.9GB)
 
-Chosen for typical student laptops with **~16GB RAM and integrated graphics**. Ollama will usually run on CPU. Larger 7B/8B models are not the project default (slower / tighter on 16GB for a live demo).
+Chosen for typical student laptops with **~16GB RAM and integrated graphics**, and for reliable **English + Traditional Chinese** replies. Ollama will usually run on CPU. Larger 7B/8B models are not the project default.
 
-Optional lighter fallback:
+`llama3.2:3b` is kept as an optional English-leaning alternative, but it often fails on Traditional Chinese (short/empty replies like `.`).
 
 ```text
-ollama pull llama3.2:1b
-set OLLAMA_MODEL=llama3.2:1b
+ollama pull qwen2.5:3b
 ```
 
 ## Requirements
@@ -27,7 +26,7 @@ set OLLAMA_MODEL=llama3.2:1b
 2. Pull the model:
 
 ```bash
-ollama pull llama3.2:3b
+ollama pull qwen2.5:3b
 ```
 
 3. Install Python dependencies from the project root:
@@ -69,7 +68,7 @@ run.bat
 
 | Variable       | Default                     | Meaning              |
 | -------------- | --------------------------- | -------------------- |
-| `OLLAMA_MODEL` | `llama3.2:3b`               | Model name in Ollama |
+| `OLLAMA_MODEL` | `qwen2.5:3b`                | Model name in Ollama |
 | `OLLAMA_HOST`  | `http://127.0.0.1:11434`    | Local Ollama URL     |
 | `OLLAMA_TIMEOUT` | `180`                     | Chat timeout (seconds) |
 
@@ -78,8 +77,11 @@ run.bat
 Example questions:
 
 1. What is a heuristic in informed search?
-2. Give a small example with A*.
-3. Off-topic: What’s the weather? (should redirect to course topics)
+2. Can you use Traditional Chinese for responding my question in the chat?
+3. 什麼是啟發式搜尋？
+4. Off-topic: What’s the weather? (should redirect to course topics)
+
+Each tutor reply has a **Copy** button for the plain-text/markdown content.
 
 ## Project layout
 

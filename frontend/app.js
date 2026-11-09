@@ -27,6 +27,45 @@
     }
   }
 
+  function addCopyButton(wrap, content) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "copy-btn";
+    btn.textContent = "Copy";
+    btn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(content);
+        btn.textContent = "Copied";
+        setTimeout(() => {
+          btn.textContent = "Copy";
+        }, 1200);
+      } catch {
+        // Fallback for older browsers / denied clipboard permission.
+        const area = document.createElement("textarea");
+        area.value = content;
+        area.setAttribute("readonly", "");
+        area.style.position = "fixed";
+        area.style.left = "-9999px";
+        document.body.appendChild(area);
+        area.select();
+        try {
+          document.execCommand("copy");
+          btn.textContent = "Copied";
+          setTimeout(() => {
+            btn.textContent = "Copy";
+          }, 1200);
+        } catch {
+          btn.textContent = "Failed";
+          setTimeout(() => {
+            btn.textContent = "Copy";
+          }, 1200);
+        }
+        document.body.removeChild(area);
+      }
+    });
+    wrap.appendChild(btn);
+  }
+
   function appendMessage(role, content, className) {
     const wrap = document.createElement("div");
     wrap.className = `message ${className || role}`;
@@ -40,6 +79,14 @@
 
     wrap.appendChild(roleEl);
     wrap.appendChild(body);
+
+    if (role === "assistant") {
+      const actions = document.createElement("div");
+      actions.className = "actions";
+      addCopyButton(actions, content);
+      wrap.appendChild(actions);
+    }
+
     messagesEl.appendChild(wrap);
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }

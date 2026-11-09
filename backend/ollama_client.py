@@ -8,7 +8,8 @@ from typing import Any
 import httpx
 
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+# qwen2.5:3b fits ~16GB RAM / iGPU and handles Traditional Chinese far better than llama3.2:3b.
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
 REQUEST_TIMEOUT = float(os.getenv("OLLAMA_TIMEOUT", "180"))
 
 
@@ -16,12 +17,25 @@ class OllamaError(Exception):
     """Raised when the local Ollama service cannot complete a request."""
 
 
-async def chat(messages: list[dict[str, str]], model: str | None = None) -> str:
-    """Send a non-streaming chat request to local Ollama and return assistant text."""
+def _is_degenerate_reply(text: str) -> bool:
+    """Detect near-empty / punctuation-only replies that small models sometimes emit."""
+    stripped = text.strip()
+    if not stripped:
+        return True
+    # Only punctuation / symbols, or a very short non-word reply.
+    meaningful = "".join(ch for ch in stripped if ch.isalnum() or ("\u4e00" <= ch <= "\u9fff"))
+    return len(meaningful) < 2
+
+
+async def _chat_once(messages: list[dict[str, str]], model: str) -> str:
     payload: dict[str, Any] = {
-        "model": model or OLLAMA_MODEL,
+        "model": model,
         "messages": messages,
         "stream": False,
+        "options": {
+            "temperature": 0.7,
+            "num_predict": 512,
+        },
     }
     try:
         async with httpx.AsyncClient(base_url=OLLAMA_HOST, timeout=REQUEST_TIMEOUT) as client:
@@ -46,6 +60,33 @@ async def chat(messages: list[dict[str, str]], model: str | None = None) -> str:
     if not content:
         raise OllamaError("Ollama returned an empty response.")
     return content
+
+
+async def chat(messages: list[dict[str, str]], model: str | None = None) -> str:
+    """Send a chat request to local Ollama; retry once if the reply is degenerate."""
+    chosen = model or OLLAMA_MODEL
+    content = await _chat_once(messages, chosen)
+    if not _is_degenerate_reply(content):
+        return content
+
+    retry_messages = list(messages) + [
+        {"role": "assistant", "content": content},
+        {
+            "role": "user",
+            "content": (
+                "Your previous reply was incomplete or only punctuation. "
+                "Please answer again fully, with complete sentences and real content. "
+                "If Traditional Chinese was requested, write the full answer in 繁體中文."
+            ),
+        },
+    ]
+    retried = await _chat_once(retry_messages, chosen)
+    if _is_degenerate_reply(retried):
+        raise OllamaError(
+            "The local model returned an incomplete reply. "
+            "Try again, or use: ollama pull qwen2.5:3b"
+        )
+    return retried
 
 
 async def health() -> dict[str, Any]:

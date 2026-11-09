@@ -67,6 +67,26 @@ body {
   margin-bottom: 0.2rem;
 }
 
+.message .actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.35rem;
+}
+
+.message .copy-btn {
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid #aaa;
+  background: #f7f7f7;
+  color: #333;
+  cursor: pointer;
+}
+
+.message .copy-btn:hover {
+  background: #ececec;
+}
+
 .message .body {
   white-space: pre-wrap;
 }
