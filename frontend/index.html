@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Tutor</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="header">
+        <h1>AI Tutor</h1>
+        <p id="status" class="status">Checking local model…</p>
+      </header>
+
+      <section id="messages" class="messages" aria-live="polite"></section>
+
+      <form id="chat-form" class="composer">
+        <textarea
+          id="input"
+          rows="2"
+          placeholder="Ask any question"
+          required
+        ></textarea>
+        <button id="send" type="submit">Send</button>
+      </form>
+    </main>
+    <script src="/static/marked.min.js"></script>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

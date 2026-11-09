@@ -1,0 +1,181 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  color: #1a1a1a;
+  background: #f3f3f3;
+}
+
+.app {
+  max-width: 720px;
+  height: 100%;
+  margin: 0 auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.status {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.status.error {
+  color: #8a1f1f;
+}
+
+.status.ok {
+  color: #1f5a2e;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #d0d0d0;
+  padding: 0.75rem;
+}
+
+.message {
+  margin: 0 0 0.75rem;
+  line-height: 1.45;
+}
+
+.message .role {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #666;
+  margin-bottom: 0.2rem;
+}
+
+.message .body {
+  white-space: pre-wrap;
+}
+
+.message .body.markdown {
+  white-space: normal;
+}
+
+.message .markdown > *:first-child {
+  margin-top: 0;
+}
+
+.message .markdown > *:last-child {
+  margin-bottom: 0;
+}
+
+.message .markdown p,
+.message .markdown ul,
+.message .markdown ol,
+.message .markdown pre,
+.message .markdown blockquote {
+  margin: 0.4rem 0;
+}
+
+.message .markdown ul,
+.message .markdown ol {
+  padding-left: 1.4rem;
+}
+
+.message .markdown code {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.9em;
+  background: #f0f0f0;
+  padding: 0.05em 0.25em;
+}
+
+.message .markdown pre {
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  padding: 0.5rem 0.65rem;
+  overflow-x: auto;
+}
+
+.message .markdown pre code {
+  background: none;
+  padding: 0;
+}
+
+.message .markdown h1,
+.message .markdown h2,
+.message .markdown h3,
+.message .markdown h4 {
+  margin: 0.6rem 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.message .markdown blockquote {
+  margin-left: 0;
+  padding-left: 0.75rem;
+  border-left: 3px solid #ccc;
+  color: #444;
+}
+
+.message.user {
+  color: #111;
+}
+
+.message.assistant {
+  color: #222;
+}
+
+.message.error {
+  color: #8a1f1f;
+}
+
+.composer {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.composer textarea {
+  flex: 1;
+  resize: vertical;
+  min-height: 3rem;
+  max-height: 8rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid #bdbdbd;
+  font: inherit;
+  background: #fff;
+}
+
+.composer button {
+  padding: 0.55rem 1rem;
+  border: 1px solid #333;
+  background: #222;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.composer button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.composer textarea:focus,
+.composer button:focus {
+  outline: 2px solid #666;
+  outline-offset: 1px;
+}
