@@ -3,37 +3,47 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AI Tutor</title>
+    <title>COMP4431 AI Tutor</title>
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
     <main class="app">
-      <header class="header">
-        <h1>AI Tutor</h1>
-        <p id="status" class="status" hidden></p>
+      
+      <header class="header" style="display: flex; align-items: center; gap: 20px; margin-bottom: 20px;">
+        <div id="avatar-fallback" style="display: flex; width: 100px; height: 100px; background: #e0e7ff; border-radius: 50%; border: 4px solid #4f46e5; font-size: 3rem; transition: all 0.3s; align-items: center; justify-content: center;">
+          🤖
+        </div>
+        <div>
+          <h1 style="margin: 0;">COMP4431 AI Tutor</h1>
+          <p id="status" class="status" hidden style="margin: 0;"></p>
+        </div>
       </header>
 
       <section id="messages" class="messages" aria-live="polite"></section>
 
-      <section class="docs" aria-label="PDF references">
-        <div class="docs-row">
-          <label class="upload-label">
-            Upload PDF
-            <input id="pdf-input" type="file" accept="application/pdf,.pdf" hidden />
-          </label>
-          <button id="clear-docs" type="button">Clear PDF</button>
+      <div class="settings-bar" style="margin: 10px 0; display: flex; gap: 20px; align-items: center; padding: 10px; background: #f8f9fa; border-radius: 8px;">
+        <div>
+          <label for="language-select" style="font-weight: bold; font-size: 14px;">Language:</label>
+          <select id="language-select" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
+            <option value="English">English</option>
+            <option value="Traditional Chinese">中文 (Traditional Chinese)</option>
+          </select>
         </div>
-        <p id="ingest-status" class="ingest-status"></p>
-        <ul id="doc-list" class="doc-list"></ul>
-      </section>
+        <div>
+          <label for="learning-mode" style="font-weight: bold; font-size: 14px;">Mode:</label>
+          <select id="learning-mode" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
+            <option value="Standard">Standard</option>
+            <option value="ELI5">ELI5 (Explain Like I'm 5)</option>
+            <option value="Deep Dive">Deep Dive (Technical)</option>
+            <option value="Exam Prep">Exam Prep</option>
+          </select>
+        </div>
+        <!-- NEW: Mute Button -->
+        <button id="mute-btn" type="button" style="margin-left: auto; padding: 6px 12px; cursor: pointer; border: 1px solid #ccc; background: white; border-radius: 4px; font-weight: bold;">🔊 Audio ON</button>
+      </div>
 
       <form id="chat-form" class="composer">
-        <textarea
-          id="input"
-          rows="2"
-          placeholder="Ask any question"
-          required
-        ></textarea>
+        <textarea id="input" rows="2" placeholder="Ask any question about AI, Neural Networks, or Algorithms..." required></textarea>
         <button id="send" type="submit">Send</button>
       </form>
     </main>

@@ -10,7 +10,19 @@ def retrieve_for_query(query: str, k: int | None = None) -> tuple[str, list[str]
     """Return (formatted_context, unique_source_filenames) for a question."""
     if not has_documents():
         return "", []
+        
     docs = similarity_search(query, k=k or RETRIEVE_K)
+    
+    # --- DEBUG PRINT STATEMENTS ---
+    print(f"\n[DEBUG] SEARCHING FOR: '{query}'")
+    print(f"[DEBUG] RETRIEVED {len(docs)} CHUNKS:")
+    for i, d in enumerate(docs):
+        page = d.metadata.get('page', '?')
+        preview = d.page_content[:150].replace('\n', ' ')
+        print(f"  -> PAGE {page}: {preview}...")
+    print("-" * 40 + "\n")
+    # ------------------------------
+    
     return format_context(docs), source_names(docs)
 
 

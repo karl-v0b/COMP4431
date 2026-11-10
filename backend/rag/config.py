@@ -12,7 +12,8 @@ MAX_FILE_BYTES = int(os.getenv("RAG_MAX_FILE_BYTES", str(20 * 1024 * 1024)))
 MAX_PAGES = int(os.getenv("RAG_MAX_PAGES", "30"))
 MAX_DOCUMENTS = int(os.getenv("RAG_MAX_DOCUMENTS", "3"))
 MAX_FIGURES_PER_PDF = int(os.getenv("RAG_MAX_FIGURES", "20"))
-RETRIEVE_K = int(os.getenv("RAG_RETRIEVE_K", "4"))
+# INCREASED FROM 4 TO 10
+RETRIEVE_K = int(os.getenv("RAG_RETRIEVE_K", "10"))
 
 CHUNK_SIZE = 900
 CHUNK_OVERLAP = 180
