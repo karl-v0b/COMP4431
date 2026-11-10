@@ -20,7 +20,10 @@ ROOT = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = ROOT / "frontend"
 PROMPT_PATH = Path(__file__).resolve().parent / "prompts" / "tutor_system.txt"
 
+from backend.quiz import router as quiz_router
+
 app = FastAPI(title="AI Tutor", docs_url=None, redoc_url=None)
+app.include_router(quiz_router)
 
 
 def load_system_prompt() -> str:
