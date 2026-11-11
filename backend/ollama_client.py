@@ -27,7 +27,7 @@ def _is_degenerate_reply(text: str) -> bool:
     return len(meaningful) < 2
 
 
-async def _chat_once(messages: list[dict[str, str]], model: str) -> str:
+async def _chat_once(messages: list[dict[str, str]], model: str, *, json_mode: bool = False) -> str:
     payload: dict[str, Any] = {
         "model": model,
         "messages": messages,
@@ -37,6 +37,9 @@ async def _chat_once(messages: list[dict[str, str]], model: str) -> str:
             "num_predict": 512,
         },
     }
+    if json_mode:
+        payload["format"] = "json"
+        payload["options"].update(temperature=0.3, num_predict=4096)
     try:
         async with httpx.AsyncClient(base_url=OLLAMA_HOST, timeout=REQUEST_TIMEOUT) as client:
             response = await client.post("/api/chat", json=payload)
@@ -135,3 +138,7 @@ async def health() -> dict[str, Any]:
         if model_available
         else f"Model '{model}' not found. Run: ollama pull {model}",
     }
+
+
+async def quiz_json(messages: list[dict[str, str]]) -> str:
+    return await _chat_once(messages, OLLAMA_MODEL, json_mode=True)

@@ -176,3 +176,12 @@ Serves the chat UI (`frontend/index.html`). Static assets are under `/static/...
 - **Hardware:** ~16GB RAM + iGPU; prefer ~3B chat models; first replies on CPU can be slow.
 - **Setup auto-fix:** `run.py` can pip-install deps and `ollama pull` models; Ollama app install is best-effort (`winget`/`brew`) — may still need manual install from https://ollama.com/download.
 - **Upload caps (defaults):** ~20MB / 30 pages / 3 PDFs / 20 figures captioned per PDF (`backend/rag/config.py`).
+
+## Quiz mode addition
+
+- Implemented PDF-grounded multiple-choice quizzes in `backend/quiz.py` and `frontend/quiz.js`.
+- Chat/Quiz navigation; topic, count, difficulty, and language controls.
+- Structured JSON generation through existing local Ollama model; validation and one retry.
+- Server-side answer keys and scoring; explanations and retrieved source/page/excerpt after submission.
+- Up to 100 in-memory quiz sessions; one-hour expiry. Existing PDF clearing leaves quiz snapshots intact.
+- Added isolated API tests in `tests/test_quiz.py`. Real-model answer quality still needs review on the target machine.

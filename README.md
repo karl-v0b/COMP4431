@@ -109,3 +109,18 @@ COMP4431/
     app.js
     marked.min.js
 ```
+
+## Quiz mode
+
+1. Run `python run.py` and upload lecture PDFs as usual.
+2. Select **Quiz**, enter a topic present in your notes, and choose 1, 3, or 5 questions, difficulty, and English or Traditional Chinese.
+3. Select **Generate quiz**, answer every question, and select **Submit answers**.
+4. Review your score, explanations, and expandable source passages. Generate another quiz to practise again.
+
+Quiz generation runs locally using the existing chat and embedding models. No extra models or packages are required. Answers are stored on the server and returned only after submission. Each quiz lasts one hour or until the server restarts; at most 100 quizzes are retained. Clearing uploaded PDFs does not clear an already generated quiz's evidence snapshot. Quiz history is not saved to disk.
+
+Questions are based on six retrieved passages, not exhaustive coverage of all uploaded notes. Generated answer keys and explanations may be wrong; review the evidence. Difficulty is requested from the model, not formally calibrated. Local generation may take a few minutes. Invalid output is retried once and then shown as an actionable error.
+
+API: `POST /api/quiz` accepts `topic`, `count` (1–5), `difficulty` (easy/medium/hard), and `language` (English/Traditional Chinese). `POST /api/quiz/{id}/submit` accepts zero-based `answers` in question order.
+
+Isolated tests (with dependencies installed): `python -m unittest discover -s tests`.

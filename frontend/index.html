@@ -13,6 +13,26 @@
         <p id="status" class="status" hidden></p>
       </header>
 
+      <nav class="mode-switch" aria-label="Tutor mode">
+        <button id="chat-mode" type="button" aria-pressed="true">Chat</button>
+        <button id="quiz-mode" type="button" aria-pressed="false">Quiz</button>
+      </nav>
+      <section id="quiz-panel" hidden aria-label="Lecture quiz">
+        <h2>Test your understanding</h2>
+        <p>Upload lecture PDFs below, then choose a topic. Questions use retrieved passages, not the entire course.</p>
+        <form id="quiz-settings">
+          <label>Topic <input id="quiz-topic" required maxlength="200" placeholder="e.g. breadth-first search"></label>
+          <div class="quiz-controls">
+            <label>Questions <select id="quiz-count"><option>1</option><option selected>3</option><option>5</option></select></label>
+            <label>Difficulty <select id="quiz-difficulty"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option></select></label>
+            <label>Language <select id="quiz-language"><option>English</option><option>Traditional Chinese</option></select></label>
+          </div>
+          <button type="submit">Generate quiz</button>
+        </form>
+        <p id="quiz-status" role="status" aria-live="polite"></p>
+        <form id="quiz-answers" hidden></form>
+        <p class="quiz-note">AI-generated questions and answer keys can contain mistakes. Review the supporting passages. Quizzes expire after one hour or a server restart.</p>
+      </section>
       <section id="messages" class="messages" aria-live="polite"></section>
 
       <section class="docs" aria-label="PDF references">
@@ -39,5 +59,6 @@
     </main>
     <script src="/static/marked.min.js"></script>
     <script src="/static/app.js"></script>
+    <script src="/static/quiz.js"></script>
   </body>
 </html>
