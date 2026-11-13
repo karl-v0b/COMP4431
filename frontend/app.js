@@ -32,12 +32,13 @@
     }
   }
 
-  function addCopyButton(wrap, content) {
+  function addCopyButton(actionsEl, getContent) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "copy-btn";
     btn.textContent = "Copy";
     btn.addEventListener("click", async () => {
+      const content = typeof getContent === "function" ? getContent() : getContent;
       try {
         await navigator.clipboard.writeText(content);
         btn.textContent = "Copied";
@@ -67,7 +68,27 @@
         document.body.removeChild(area);
       }
     });
-    wrap.appendChild(btn);
+    actionsEl.appendChild(btn);
+  }
+
+  function addSummaryToggle(actionsEl, bodyEl, fullText, summaryText) {
+    const summary = (summaryText || "").trim();
+    const full = (fullText || "").trim();
+    if (!summary || summary === full) return;
+
+    let showingSummary = false;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "summary-btn";
+    btn.textContent = "Summary";
+    btn.addEventListener("click", () => {
+      showingSummary = !showingSummary;
+      const next = showingSummary ? summary : full;
+      renderContent(bodyEl, "assistant", next);
+      bodyEl.dataset.activeText = next;
+      btn.textContent = showingSummary ? "Full" : "Summary";
+    });
+    actionsEl.appendChild(btn);
   }
 
   function formatSourcesLabel(sources) {
@@ -94,7 +115,7 @@
     refEl.textContent = label;
   }
 
-  function appendMessage(role, content, className, sources) {
+  function appendMessage(role, content, className, sources, summary) {
     const wrap = document.createElement("div");
     wrap.className = `message ${className || role}`;
 
@@ -104,6 +125,7 @@
 
     const body = document.createElement("div");
     renderContent(body, role, content);
+    body.dataset.activeText = content;
 
     wrap.appendChild(roleEl);
     wrap.appendChild(body);
@@ -112,7 +134,8 @@
     if (role === "assistant") {
       const actions = document.createElement("div");
       actions.className = "actions";
-      addCopyButton(actions, content);
+      addSummaryToggle(actions, body, content, summary);
+      addCopyButton(actions, () => body.dataset.activeText || content);
       wrap.appendChild(actions);
     }
 
@@ -121,7 +144,7 @@
     return wrap;
   }
 
-  function showThinking() {
+  function showThinking(label) {
     hideThinking();
     const wrap = document.createElement("div");
     wrap.className = "message assistant thinking";
@@ -133,17 +156,26 @@
 
     const body = document.createElement("div");
     body.className = "body thinking-body";
+    const labelText = label || "Working";
     body.innerHTML =
-      '<span class="thinking-label">Thinking</span>' +
+      '<span class="thinking-label"></span>' +
       '<span class="thinking-dots" aria-hidden="true">' +
       '<span></span><span></span><span></span>' +
       "</span>";
+    body.querySelector(".thinking-label").textContent = labelText;
 
     wrap.appendChild(roleEl);
     wrap.appendChild(body);
     messagesEl.appendChild(wrap);
     messagesEl.scrollTop = messagesEl.scrollHeight;
     thinkingEl = wrap;
+  }
+
+  function setThinkingLabel(label) {
+    if (!thinkingEl) return;
+    const labelEl = thinkingEl.querySelector(".thinking-label");
+    if (labelEl && label) labelEl.textContent = label;
+    messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
   function hideThinking() {
@@ -153,6 +185,103 @@
     thinkingEl = null;
     const leftover = document.getElementById("thinking-message");
     if (leftover) leftover.remove();
+  }
+
+  function formatDetail(detail, fallback) {
+    if (detail == null || detail === "") return fallback || "Request failed.";
+    if (typeof detail === "string") return detail;
+    if (Array.isArray(detail)) {
+      return detail
+        .map((item) => {
+          if (typeof item === "string") return item;
+          if (item && typeof item === "object") {
+            return item.msg || item.message || item.detail || JSON.stringify(item);
+          }
+          return String(item);
+        })
+        .filter(Boolean)
+        .join("; ");
+    }
+    if (typeof detail === "object") {
+      if (typeof detail.msg === "string") return detail.msg;
+      if (typeof detail.message === "string") return detail.message;
+      if (typeof detail.detail === "string") return detail.detail;
+      try {
+        return JSON.stringify(detail);
+      } catch {
+        return fallback || "Request failed.";
+      }
+    }
+    return String(detail);
+  }
+
+  function applyChatEvent(event, state) {
+    if (!event || typeof event !== "object") return;
+    if (event.type === "stage") {
+      setThinkingLabel(event.label || "Working");
+      return;
+    }
+    if (event.type === "error") {
+      throw new Error(formatDetail(event.detail, "Request failed."));
+    }
+    if (event.type === "result" || (typeof event.reply === "string" && !event.type)) {
+      state.result = event;
+    }
+  }
+
+  async function readChatStream(response) {
+    if (!response.body) {
+      throw new Error("Streaming is not available in this browser.");
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let raw = "";
+    const state = { result: null };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      raw += chunk;
+      buffer += chunk;
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        let event;
+        try {
+          event = JSON.parse(trimmed);
+        } catch {
+          continue;
+        }
+        applyChatEvent(event, state);
+      }
+    }
+
+    const leftover = buffer.trim();
+    if (leftover && !leftover.startsWith("#")) {
+      try {
+        applyChatEvent(JSON.parse(leftover), state);
+      } catch {
+        // ignore incomplete trailing data
+      }
+    }
+
+    // Fallback: classic single JSON body (non-stream / buffered responses)
+    if (!state.result || typeof state.result.reply !== "string") {
+      try {
+        applyChatEvent(JSON.parse(raw.trim()), state);
+      } catch {
+        // ignore
+      }
+    }
+
+    if (!state.result || typeof state.result.reply !== "string") {
+      throw new Error("The server did not return a complete answer. Hard-refresh the page (Cmd+Shift+R) and try again.");
+    }
+    return state.result;
   }
 
   function setBusy(busy) {
@@ -293,42 +422,56 @@
     const userMsgEl = appendMessage("user", message);
     inputEl.value = "";
     setBusy(true);
-    showThinking();
+    showThinking("Working");
 
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/x-ndjson",
+        },
         body: JSON.stringify({
           message,
           history: history.slice(-MAX_HISTORY),
         }),
       });
 
-      const data = await res.json().catch(() => ({}));
-      hideThinking();
       if (!res.ok) {
-        const detail = data.detail || `Request failed (${res.status})`;
-        appendMessage("error", detail, "error");
+        const data = await res.json().catch(() => ({}));
+        hideThinking();
+        appendMessage(
+          "error",
+          formatDetail(data.detail, `Request failed (${res.status})`),
+          "error"
+        );
         return;
       }
 
+      const data = await readChatStream(res);
+      hideThinking();
+
       const reply = data.reply || "";
+      const summary = data.summary || null;
       const sources = data.sources || [];
+      if (!reply) {
+        appendMessage("error", "The tutor returned an empty answer. Please try again.", "error");
+        return;
+      }
       addSourcesLabel(userMsgEl, sources);
-      appendMessage("assistant", reply, "assistant", sources);
+      appendMessage("assistant", reply, "assistant", sources, summary);
       history.push({ role: "user", content: message });
       history.push({ role: "assistant", content: reply });
       if (history.length > MAX_HISTORY) {
         history.splice(0, history.length - MAX_HISTORY);
       }
-    } catch {
+    } catch (err) {
       hideThinking();
-      appendMessage(
-        "error",
-        "Could not reach the local server. Is the app still running?",
-        "error"
-      );
+      const msg = err && typeof err.message === "string" ? err.message : "";
+      const detail = msg && !/fetch|network|Failed to fetch/i.test(msg)
+        ? msg
+        : "Could not reach the local server. Is the app still running?";
+      appendMessage("error", detail, "error");
     } finally {
       setBusy(false);
       inputEl.focus();

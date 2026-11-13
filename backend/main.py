@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+import json
 import tempfile
+from collections.abc import AsyncIterator
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from backend.ollama_client import OllamaError, chat, health
+from backend.ollama_client import OllamaError, chat, health, summarize
 from backend.rag.config import MAX_FILE_BYTES
 from backend.rag.ingest import IngestError, clear_documents, ingest_pdf, list_documents
 from backend.rag.retrieve import retrieve_for_query
@@ -21,6 +23,7 @@ FRONTEND_DIR = ROOT / "frontend"
 PROMPT_PATH = Path(__file__).resolve().parent / "prompts" / "tutor_system.txt"
 
 from backend.quiz import router as quiz_router
+from backend.summary_util import is_already_short, load_summary_prompt
 
 app = FastAPI(title="AI Tutor", docs_url=None, redoc_url=None)
 app.include_router(quiz_router)
@@ -57,6 +60,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     reply: str
+    summary: str | None = None
     sources: list[str] = Field(default_factory=list)
 
 
@@ -119,31 +123,87 @@ async def api_upload(file: UploadFile = File(...)):
     }
 
 
-@app.post("/api/chat", response_model=ChatResponse)
-async def api_chat(body: ChatRequest):
-    trimmed = body.history[-12:]
-    question = body.message.strip()
-    rag_context = ""
-    sources: list[str] = []
-    if has_documents():
-        try:
-            rag_context, sources = retrieve_for_query(question)
-        except Exception as exc:
-            raise HTTPException(
-                status_code=503,
-                detail=f"RAG retrieval failed: {exc}",
-            ) from exc
+def _ndjson(payload: dict) -> bytes:
+    """One NDJSON line as bytes, plus padding so stage events flush before long awaits."""
+    line = json.dumps(payload, ensure_ascii=False) + "\n"
+    # Non-JSON padding line (client skips parse failures); helps ASGI/proxy flush.
+    pad = b"#" + (b" " * 2048) + b"\n"
+    return line.encode("utf-8") + pad
 
-    messages: list[dict[str, str]] = [
-        {"role": "system", "content": build_system_prompt(rag_context)},
-        *[m.model_dump() for m in trimmed],
-        {"role": "user", "content": question},
-    ]
-    try:
-        reply = await chat(messages)
-    except OllamaError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    return ChatResponse(reply=reply, sources=sources)
+
+@app.post("/api/chat")
+async def api_chat(body: ChatRequest):
+    """Stream progress stages as NDJSON, then a final result (or error) event."""
+
+    async def event_stream() -> AsyncIterator[bytes]:
+        trimmed = body.history[-12:]
+        question = body.message.strip()
+        rag_context = ""
+        sources: list[str] = []
+
+        if has_documents():
+            yield _ndjson(
+                {
+                    "type": "stage",
+                    "stage": "retrieve",
+                    "label": "Retrieving notes",
+                }
+            )
+            try:
+                rag_context, sources = retrieve_for_query(question)
+            except Exception as exc:
+                yield _ndjson(
+                    {"type": "error", "detail": f"RAG retrieval failed: {exc}"}
+                )
+                return
+
+        yield _ndjson(
+            {"type": "stage", "stage": "write", "label": "Writing answer"}
+        )
+        messages: list[dict[str, str]] = [
+            {"role": "system", "content": build_system_prompt(rag_context)},
+            *[m.model_dump() for m in trimmed],
+            {"role": "user", "content": question},
+        ]
+        try:
+            reply = await chat(messages)
+        except OllamaError as exc:
+            yield _ndjson({"type": "error", "detail": str(exc)})
+            return
+
+        summary: str | None = None
+        if not is_already_short(reply):
+            yield _ndjson(
+                {
+                    "type": "stage",
+                    "stage": "summary",
+                    "label": "Preparing summary",
+                }
+            )
+            try:
+                summary = await summarize(reply, load_summary_prompt())
+            except OllamaError:
+                summary = None
+            if summary and summary.strip() == reply.strip():
+                summary = None
+
+        yield _ndjson(
+            {
+                "type": "result",
+                "reply": reply,
+                "summary": summary,
+                "sources": sources,
+            }
+        )
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="application/x-ndjson",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.get("/")

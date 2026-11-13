@@ -51,6 +51,9 @@ COMP4431/
     ollama_client.py        # local chat/health
     setup_check.py          # startup prerequisite checks + auto-fix
     prompts/tutor_system.txt
+    prompts/summary_system.txt  # Summary/Full rewrite rules
+    summary_util.py         # is_already_short + load summary prompt
+    quiz.py                 # PDF-grounded quiz API
     rag/
       config.py             # limits + model names
       store.py              # in-memory vector store
@@ -61,7 +64,15 @@ COMP4431/
     index.html
     styles.css
     app.js
+    quiz.js
+    glossary.js           # Fast Check term glossary
+    glossary_match.js     # longest-match identifyTerm
+    fastcheck.js          # highlight → popup
     marked.min.js
+  tests/
+    test_quiz.py
+    test_summary.py
+    test_fastcheck.py
 ```
 
 **Defaults:** max ~20MB / 30 pages / 3 PDFs; retrieve `k=4`; chat model `qwen2.5:3b`
@@ -109,15 +120,16 @@ Serves the chat UI (`frontend/index.html`). Static assets are under `/static/...
 }
 ```
 - `history`: prior user/assistant turns only (no system). Server keeps last ~12 turns.
-**Response:**
+**Response:** NDJSON stream (`application/x-ndjson`), one JSON object per line:
 ```json
-{
-  "reply": "markdown text from tutor",
-  "sources": ["lecture.pdf"]
-}
+{"type":"stage","stage":"retrieve","label":"Retrieving notes"}
+{"type":"stage","stage":"write","label":"Writing answer"}
+{"type":"stage","stage":"summary","label":"Preparing summary"}
+{"type":"result","reply":"...","summary":"...|null","sources":["lecture.pdf"]}
 ```
-- `sources`: PDF filenames used in retrieval for this turn (may be `[]` if no PDFs / no hits). UI labels messages with these names.  
-**Errors:** `503` if Ollama/RAG fails (`detail` string).
+- Stages: `retrieve` only if PDFs are loaded; `summary` only when a summary will be generated. UI updates the thinking label from `label`.
+- Final `result` carries `reply`, optional `summary`, and `sources` (same meaning as before). Chat history should keep `reply` only.
+- Mid-stream failure: `{"type":"error","detail":"..."}` (RAG/chat failures). Summary failures do not emit error; `summary` may be null.
 
 ### `POST /api/upload`
 **Why:** Add/replace a PDF in the **server-lifetime** index (text, tables, figure captions → embed).  
@@ -155,8 +167,13 @@ Serves the chat UI (`frontend/index.html`). Static assets are under `/static/...
 
 - Minimal plain UI (no CDN icons/fonts for core chrome).
 - Tutor replies: Markdown via offline `marked.min.js`; user messages stay plain text.
-- Copy button under each tutor reply (bottom-right row).
-- Thinking animation while `/api/chat` is in flight.
+- Actions under each tutor reply (bottom-right row): **Summary** / **Full** toggle (when `summary` is present) then **Copy**.
+  - Default view is the full reply; **Summary** switches to the short version and the button label becomes **Full**.
+  - **Copy** copies the currently displayed text.
+  - Conversation history always stores the full `reply`.
+- Thinking animation while `/api/chat` is in flight; label updates from the NDJSON stream: **Retrieving notes** (if PDFs) → **Writing answer** → **Preparing summary** (when summarizing).
+- **Fast Check:** click-drag highlight inside a tutor reply body. Client finds the **longest** glossary match in the selection (local `glossary.js`, no Ollama). Floating popup shows the term + ≤3-sentence definition; clearing the selection (or clicking away / scrolling) hides it. Unknown highlights show nothing.
+  - Course glossary: **114** distinct concepts across 10 shallow (~2h) topics (Intro AI; Heuristic Search; KB agent & Expert System; Hill Climbing / SA / GA; Constraints & games; ML; Neural Nets; Deep Learning; Bayesian; Sequential Modeling & Transformer). Plus 2 app extras: RAG, prompt.
 - Header model status hidden unless unhealthy.
 - PDF panel: Upload PDF / Clear PDF.
   - Status: `x PDF is Loaded` / `All PDF is Cleared` (after clear) / `Loading PDF…`
@@ -174,6 +191,7 @@ Serves the chat UI (`frontend/index.html`). Static assets are under `/static/...
 - **Chinese:** use `qwen2.5:3b`; `llama3.2:3b` often failed Traditional Chinese (`.` / empty lists).
 - **Figures:** `moondream` captions at upload are short summaries, not perfect chart OCR; chat model never sees raw page images.
 - **Hardware:** ~16GB RAM + iGPU; prefer ~3B chat models; first replies on CPU can be slow.
+- **Chat length:** full tutor replies use `OLLAMA_NUM_PREDICT` (default **2048**; was 512 and truncated mid-sentence). Summaries still use 768. Longer replies take more time on local hardware.
 - **Setup auto-fix:** `run.py` can pip-install deps and `ollama pull` models; Ollama app install is best-effort (`winget`/`brew`) — may still need manual install from https://ollama.com/download.
 - **Upload caps (defaults):** ~20MB / 30 pages / 3 PDFs / 20 figures captioned per PDF (`backend/rag/config.py`).
 
@@ -185,3 +203,19 @@ Serves the chat UI (`frontend/index.html`). Static assets are under `/static/...
 - Server-side answer keys and scoring; explanations and retrieved source/page/excerpt after submission.
 - Up to 100 in-memory quiz sessions; one-hour expiry. Existing PDF clearing leaves quiz snapshots intact.
 - Added isolated API tests in `tests/test_quiz.py`. Real-model answer quality still needs review on the target machine.
+
+## Summary / Full toggle
+
+- After each successful chat reply, the server may generate a shorter structured Markdown summary (`backend/prompts/summary_system.txt` + `summarize()` in `ollama_client.py`; helpers in `backend/summary_util.py`).
+- Rules (prompt-enforced): &lt;~half length; structure-first (prefer `Term: meaning`, tables, steps/formulas over bullet walls); no full code dumps (signature/sketch only); keep core points; same language; no new facts; keep citations/notation; no preamble.
+- UI toggle next to Copy; no extra models. Summary quality depends on the local 3B model.
+- Tests: `tests/test_summary.py` (short-skip helper, prompt rules, mocked `summarize`).
+
+## Fast Check
+
+- Feasible and implemented as **client-side longest-match glossary lookup** (instant). Calling Ollama on every highlight would be too slow for this UX.
+- Files: `frontend/glossary.js`, `frontend/glossary_match.js` (pure longest-match), `frontend/fastcheck.js`.
+- Coverage rebuilt to the 10-topic shallow-lecture inventory: **114** course entries + **2** app extras (`RAG`, `prompt`). Out-of-topic terms removed.
+- Per-topic counts: Intro 10, Heuristic Search 14, KB/Expert 11, Local search (HC/SA/GA) 12, Constraints & games 13, ML 13, Neural Nets 11, Deep Learning 8, Bayesian 10, Sequential/Transformer 12.
+- Limit: only glossary terms; not open-vocabulary AI explanations.
+- Tests: `tests/test_fastcheck.py` (Node harness; counts, longest-match, boundaries, ≤3-sentence defs).
