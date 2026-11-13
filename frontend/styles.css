@@ -320,6 +320,38 @@ body {
   outline-offset: 1px;
 }
 
+.fastcheck-popup {
+  position: fixed;
+  z-index: 1000;
+  max-width: 320px;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #bbb;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  color: #1a1a1a;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+.fastcheck-hint {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #666;
+  margin-bottom: 0.2rem;
+}
+
+.fastcheck-term {
+  font-weight: 650;
+  margin-bottom: 0.3rem;
+  color: #222;
+}
+
+.fastcheck-def {
+  color: #333;
+}
+
 [hidden] { display: none !important; }
 .mode-switch, .quiz-controls { display: flex; gap: .6rem; flex-wrap: wrap; }
 .mode-switch button, #quiz-panel button { padding: .5rem .8rem; cursor: pointer; border: 1px solid #aaa; border-radius: 5px; }

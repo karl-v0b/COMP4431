@@ -11,6 +11,8 @@ OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
 # qwen2.5:3b fits ~16GB RAM / iGPU and handles Traditional Chinese far better than llama3.2:3b.
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
 REQUEST_TIMEOUT = float(os.getenv("OLLAMA_TIMEOUT", "180"))
+# Max new tokens for tutor replies. 512 cut off multi-example answers mid-sentence.
+CHAT_NUM_PREDICT = int(os.getenv("OLLAMA_NUM_PREDICT", "2048"))
 
 
 class OllamaError(Exception):
@@ -37,7 +39,7 @@ async def _chat_once(
 ) -> str:
     options: dict[str, Any] = {
         "temperature": 0.7 if temperature is None else temperature,
-        "num_predict": 512 if num_predict is None else num_predict,
+        "num_predict": CHAT_NUM_PREDICT if num_predict is None else num_predict,
     }
     payload: dict[str, Any] = {
         "model": model,
