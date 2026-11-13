@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from backend.ollama_client import OllamaError, chat, health
+from backend.ollama_client import OllamaError, chat, health, summarize
 from backend.rag.config import MAX_FILE_BYTES
 from backend.rag.ingest import IngestError, clear_documents, ingest_pdf, list_documents
 from backend.rag.retrieve import retrieve_for_query
@@ -19,6 +19,9 @@ from backend.rag.store import get_status, has_documents
 ROOT = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = ROOT / "frontend"
 PROMPT_PATH = Path(__file__).resolve().parent / "prompts" / "tutor_system.txt"
+SUMMARY_PROMPT_PATH = Path(__file__).resolve().parent / "prompts" / "summary_system.txt"
+SHORT_REPLY_MAX_LINES = 3
+SHORT_REPLY_MAX_WORDS = 40
 
 from backend.quiz import router as quiz_router
 
@@ -28,6 +31,20 @@ app.include_router(quiz_router)
 
 def load_system_prompt() -> str:
     return PROMPT_PATH.read_text(encoding="utf-8").strip()
+
+
+def load_summary_prompt() -> str:
+    return SUMMARY_PROMPT_PATH.read_text(encoding="utf-8").strip()
+
+
+def is_already_short(reply: str) -> bool:
+    """Skip summary when the full reply is already brief."""
+    text = reply.strip()
+    if not text:
+        return True
+    lines = [ln for ln in text.splitlines() if ln.strip()]
+    words = text.split()
+    return len(lines) <= SHORT_REPLY_MAX_LINES or len(words) < SHORT_REPLY_MAX_WORDS
 
 
 def build_system_prompt(rag_context: str) -> str:
@@ -57,6 +74,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     reply: str
+    summary: str | None = None
     sources: list[str] = Field(default_factory=list)
 
 
@@ -143,7 +161,17 @@ async def api_chat(body: ChatRequest):
         reply = await chat(messages)
     except OllamaError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    return ChatResponse(reply=reply, sources=sources)
+
+    summary: str | None = None
+    if not is_already_short(reply):
+        try:
+            summary = await summarize(reply, load_summary_prompt())
+        except OllamaError:
+            summary = None
+        if summary and summary.strip() == reply.strip():
+            summary = None
+
+    return ChatResponse(reply=reply, summary=summary, sources=sources)
 
 
 @app.get("/")

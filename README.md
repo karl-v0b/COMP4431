@@ -5,7 +5,7 @@ Local, offline AI course tutor chatbot. No cloud API keys. Runs on your machine 
 ## Features
 
 - Domain AI/CS tutoring in English or Chinese
-- Markdown tutor replies + Copy button
+- Markdown tutor replies + Copy button + **Summary / Full** toggle (AI short study summary generated with each reply)
 - **PDF upload RAG (additional feature):** upload lecture PDFs; the tutor answers using retrieved text, tables, and short captions of figures/graphs. Indexed documents live **until the server process stops**.
 
 ## Hardware note
@@ -57,7 +57,7 @@ If Ollama cannot be installed automatically, install from https://ollama.com/dow
 ### Useful APIs
 
 - `GET /api/health`
-- `POST /api/chat` — `{"message":"...","history":[]}`
+- `POST /api/chat` — `{"message":"...","history":[]}` → `{"reply":"...","summary":"...|null","sources":[]}` (`summary` is a shorter structured rewrite when the full reply is long enough; omit/null hides the UI toggle)
 - `POST /api/upload` — multipart PDF field `file`
 - `GET /api/documents`
 - `DELETE /api/documents` — clear indexed PDFs for this server run
@@ -97,6 +97,7 @@ COMP4431/
     main.py
     ollama_client.py
     prompts/tutor_system.txt
+    prompts/summary_system.txt
     rag/
       config.py
       store.py

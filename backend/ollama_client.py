@@ -27,15 +27,23 @@ def _is_degenerate_reply(text: str) -> bool:
     return len(meaningful) < 2
 
 
-async def _chat_once(messages: list[dict[str, str]], model: str, *, json_mode: bool = False) -> str:
+async def _chat_once(
+    messages: list[dict[str, str]],
+    model: str,
+    *,
+    json_mode: bool = False,
+    temperature: float | None = None,
+    num_predict: int | None = None,
+) -> str:
+    options: dict[str, Any] = {
+        "temperature": 0.7 if temperature is None else temperature,
+        "num_predict": 512 if num_predict is None else num_predict,
+    }
     payload: dict[str, Any] = {
         "model": model,
         "messages": messages,
         "stream": False,
-        "options": {
-            "temperature": 0.7,
-            "num_predict": 512,
-        },
+        "options": options,
     }
     if json_mode:
         payload["format"] = "json"
@@ -142,3 +150,47 @@ async def health() -> dict[str, Any]:
 
 async def quiz_json(messages: list[dict[str, str]]) -> str:
     return await _chat_once(messages, OLLAMA_MODEL, json_mode=True)
+
+
+async def summarize(full_reply: str, system_prompt: str, model: str | None = None) -> str:
+    """Rewrite a full tutor reply into a short structured summary."""
+    chosen = model or OLLAMA_MODEL
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {
+            "role": "user",
+            "content": (
+                "Rewrite the following tutor reply into a short study summary "
+                "following your rules.\n\n"
+                f"{full_reply.strip()}"
+            ),
+        },
+    ]
+    content = await _chat_once(
+        messages,
+        chosen,
+        temperature=0.3,
+        num_predict=768,
+    )
+    if not _is_degenerate_reply(content):
+        return content.strip()
+
+    retry_messages = list(messages) + [
+        {"role": "assistant", "content": content},
+        {
+            "role": "user",
+            "content": (
+                "Your previous summary was incomplete or only punctuation. "
+                "Rewrite the tutor reply again as a short structured Markdown summary."
+            ),
+        },
+    ]
+    retried = await _chat_once(
+        retry_messages,
+        chosen,
+        temperature=0.3,
+        num_predict=768,
+    )
+    if _is_degenerate_reply(retried):
+        raise OllamaError("The local model returned an incomplete summary.")
+    return retried.strip()

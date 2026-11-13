@@ -32,12 +32,13 @@
     }
   }
 
-  function addCopyButton(wrap, content) {
+  function addCopyButton(actionsEl, getContent) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "copy-btn";
     btn.textContent = "Copy";
     btn.addEventListener("click", async () => {
+      const content = typeof getContent === "function" ? getContent() : getContent;
       try {
         await navigator.clipboard.writeText(content);
         btn.textContent = "Copied";
@@ -67,7 +68,27 @@
         document.body.removeChild(area);
       }
     });
-    wrap.appendChild(btn);
+    actionsEl.appendChild(btn);
+  }
+
+  function addSummaryToggle(actionsEl, bodyEl, fullText, summaryText) {
+    const summary = (summaryText || "").trim();
+    const full = (fullText || "").trim();
+    if (!summary || summary === full) return;
+
+    let showingSummary = false;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "summary-btn";
+    btn.textContent = "Summary";
+    btn.addEventListener("click", () => {
+      showingSummary = !showingSummary;
+      const next = showingSummary ? summary : full;
+      renderContent(bodyEl, "assistant", next);
+      bodyEl.dataset.activeText = next;
+      btn.textContent = showingSummary ? "Full" : "Summary";
+    });
+    actionsEl.appendChild(btn);
   }
 
   function formatSourcesLabel(sources) {
@@ -94,7 +115,7 @@
     refEl.textContent = label;
   }
 
-  function appendMessage(role, content, className, sources) {
+  function appendMessage(role, content, className, sources, summary) {
     const wrap = document.createElement("div");
     wrap.className = `message ${className || role}`;
 
@@ -104,6 +125,7 @@
 
     const body = document.createElement("div");
     renderContent(body, role, content);
+    body.dataset.activeText = content;
 
     wrap.appendChild(roleEl);
     wrap.appendChild(body);
@@ -112,7 +134,8 @@
     if (role === "assistant") {
       const actions = document.createElement("div");
       actions.className = "actions";
-      addCopyButton(actions, content);
+      addSummaryToggle(actions, body, content, summary);
+      addCopyButton(actions, () => body.dataset.activeText || content);
       wrap.appendChild(actions);
     }
 
@@ -314,9 +337,10 @@
       }
 
       const reply = data.reply || "";
+      const summary = data.summary || null;
       const sources = data.sources || [];
       addSourcesLabel(userMsgEl, sources);
-      appendMessage("assistant", reply, "assistant", sources);
+      appendMessage("assistant", reply, "assistant", sources, summary);
       history.push({ role: "user", content: message });
       history.push({ role: "assistant", content: reply });
       if (history.length > MAX_HISTORY) {

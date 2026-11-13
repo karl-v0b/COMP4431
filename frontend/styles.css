@@ -120,10 +120,12 @@ body {
 .message .actions {
   display: flex;
   justify-content: flex-end;
+  gap: 0.35rem;
   margin-top: 0.35rem;
 }
 
-.message .copy-btn {
+.message .copy-btn,
+.message .summary-btn {
   font: inherit;
   font-size: 0.75rem;
   padding: 0.1rem 0.45rem;
@@ -133,7 +135,8 @@ body {
   cursor: pointer;
 }
 
-.message .copy-btn:hover {
+.message .copy-btn:hover,
+.message .summary-btn:hover {
   background: #ececec;
 }
 
@@ -157,8 +160,23 @@ body {
 .message .markdown ul,
 .message .markdown ol,
 .message .markdown pre,
-.message .markdown blockquote {
+.message .markdown blockquote,
+.message .markdown table {
   margin: 0.4rem 0;
+}
+
+.message .markdown table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.9em;
+}
+
+.message .markdown th,
+.message .markdown td {
+  border: 1px solid #ccc;
+  padding: 0.25rem 0.45rem;
+  text-align: left;
+  vertical-align: top;
 }
 
 .message .markdown ul,
