@@ -1,69 +1,110 @@
-"""Isolated API tests: model and PDF retrieval mocked; no model downloads needed."""
+"""Tests for the modal /api/quiz endpoint (no PDF / no lecture-quiz router)."""
+
+from __future__ import annotations
+
 import json
 import sys
-import types
 import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-# Keep retrieval dependencies out of this isolated test process.
-package = types.ModuleType('backend.rag')
-package.__path__ = [str(Path(__file__).resolve().parents[1] / 'backend' / 'rag')]
-sys.modules['backend.rag'] = package
-store = types.ModuleType('backend.rag.store')
-store.has_documents = lambda: True
-store.similarity_search = lambda *args: []
-sys.modules['backend.rag.store'] = store
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from backend import quiz
 
-class QuizTests(unittest.TestCase):
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from fastapi.testclient import TestClient  # noqa: E402
+
+from backend.main import app, is_off_topic  # noqa: E402
+
+
+SAMPLE_QUESTIONS = [
+    {
+        "question": "What does BFS use?",
+        "options": ["A. Queue", "B. Stack", "C. Heap", "D. Set"],
+        "correct_index": 0,
+        "explanation": "BFS explores level by level with a queue.",
+    },
+    {
+        "question": "DFS primary structure?",
+        "options": ["A. Queue", "B. Stack", "C. Heap", "D. Graph"],
+        "correct_index": 1,
+        "explanation": "DFS uses a stack or recursion.",
+    },
+    {
+        "question": "A* needs which function?",
+        "options": ["A. Random", "B. Heuristic", "C. Sort", "D. Hash"],
+        "correct_index": 1,
+        "explanation": "A* uses f(n)=g(n)+h(n).",
+    },
+]
+
+
+class OffTopicTests(unittest.TestCase):
+    def test_detects_off_topic_keywords(self):
+        self.assertTrue(is_off_topic("How do I bake a cake?"))
+        self.assertFalse(is_off_topic("Explain breadth-first search"))
+
+
+class ModalQuizApiTests(unittest.TestCase):
     def setUp(self):
-        app = FastAPI()
-        app.include_router(quiz.router)
         self.client = TestClient(app)
-        quiz._sessions.clear()
-        self.doc = types.SimpleNamespace(page_content='BFS uses a queue.', metadata={'source':'lecture.pdf','page':2})
-        self.raw = json.dumps({'questions':[{'question':'What does BFS use?', 'options':['Queue','Stack','Heap','Set'], 'answer':0,'explanation':'BFS uses a queue.','source':1}]})
 
-    def generate(self):
-        with patch.object(quiz, 'similarity_search', return_value=[self.doc]), patch.object(quiz, 'quiz_json', AsyncMock(return_value=self.raw)):
-            return self.client.post('/api/quiz', json={'topic':'BFS','count':1})
+    def test_rejects_off_topic_topic(self):
+        res = self.client.post(
+            "/api/quiz",
+            json={"topic": "chocolate cake recipe", "scope": "Big Picture"},
+        )
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("Computer Science", res.json()["detail"])
 
-    def test_generation_hides_answers_and_grades(self):
-        response = self.generate()
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertNotIn('answer', data['questions'][0])
-        self.assertNotIn('explanation', data['questions'][0])
-        for selected, expected in [(0,1),(1,0)]:
-            result = self.client.post(f"/api/quiz/{data['id']}/submit", json={'answers':[selected]}).json()
-            self.assertEqual(result['score'], expected)
-            self.assertEqual(result['results'][0]['page'], 2)
-            self.assertEqual(result['results'][0]['excerpt'], self.doc.page_content)
+    def test_returns_three_questions_from_model_json(self):
+        payload = json.dumps(SAMPLE_QUESTIONS)
+        with patch("backend.main.chat", AsyncMock(return_value=payload)) as mock_chat:
+            res = self.client.post(
+                "/api/quiz",
+                json={
+                    "topic": "BFS",
+                    "scope": "In-Depth",
+                    "language": "English",
+                },
+            )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(len(data["questions"]), 3)
+        self.assertEqual(data["questions"][0]["correct_index"], 0)
+        self.assertEqual(mock_chat.await_count, 1)
+        user_msg = mock_chat.await_args.args[0][-1]["content"]
+        self.assertIn("BFS", user_msg)
+        self.assertIn("In-Depth", user_msg)
+        self.assertIn("English", user_msg)
 
-    def test_missing_pdf(self):
-        with patch.object(quiz, 'has_documents', return_value=False):
-            self.assertEqual(self.client.post('/api/quiz', json={'topic':'BFS'}).status_code, 400)
+    def test_strips_markdown_fences_around_json(self):
+        fenced = "```json\n" + json.dumps(SAMPLE_QUESTIONS) + "\n```"
+        with patch("backend.main.chat", AsyncMock(return_value=fenced)):
+            res = self.client.post("/api/quiz", json={"topic": "DFS"})
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(len(res.json()["questions"]), 3)
 
-    def test_invalid_model_retries(self):
-        with patch.object(quiz, 'similarity_search', return_value=[self.doc]), patch.object(quiz, 'quiz_json', AsyncMock(return_value='bad json')) as model:
-            self.assertEqual(self.client.post('/api/quiz', json={'topic':'BFS'}).status_code, 502)
-            self.assertEqual(model.await_count, 2)
+    def test_invalid_model_output_returns_500(self):
+        with patch("backend.main.chat", AsyncMock(return_value="not json at all")):
+            res = self.client.post("/api/quiz", json={"topic": "A* search"})
+        self.assertEqual(res.status_code, 500)
+        self.assertIn("Quiz generation failed", res.json()["detail"])
 
-    def test_invalid_and_expired_submissions(self):
-        key = self.generate().json()['id']
-        self.assertEqual(self.client.post(f'/api/quiz/{key}/submit', json={'answers':[4]}).status_code, 422)
-        quiz._sessions[key]['created'] -= quiz.TTL + 1
-        self.assertEqual(self.client.post(f'/api/quiz/{key}/submit', json={'answers':[0]}).status_code, 404)
+    def test_wrong_question_count_returns_500(self):
+        bad = json.dumps(SAMPLE_QUESTIONS[:2])
+        with patch("backend.main.chat", AsyncMock(return_value=bad)):
+            res = self.client.post("/api/quiz", json={"topic": "Neural nets"})
+        self.assertEqual(res.status_code, 500)
 
-    def test_rejects_bad_references_and_duplicate_options(self):
-        for change in ({'source':2}, {'options':['A','A','B','C']}, {'answer':4}):
-            data = json.loads(self.raw)
-            data['questions'][0].update(change)
-            with self.assertRaises(ValueError):
-                quiz.validate_questions(json.dumps(data),1,1)
 
-if __name__ == '__main__':
+class SummaryLanguagePromptTests(unittest.TestCase):
+    def test_load_summary_prompt_includes_language(self):
+        from backend.summary_util import load_summary_prompt
+
+        prompt = load_summary_prompt("Traditional Chinese")
+        self.assertIn("Traditional Chinese", prompt)
+        self.assertIn("CRITICAL", prompt)
+
+
+if __name__ == "__main__":
     unittest.main()

@@ -150,20 +150,26 @@ async def health() -> dict[str, Any]:
     }
 
 
-async def quiz_json(messages: list[dict[str, str]]) -> str:
-    return await _chat_once(messages, OLLAMA_MODEL, json_mode=True)
-
-
-async def summarize(full_reply: str, system_prompt: str, model: str | None = None) -> str:
+async def summarize(
+    full_reply: str,
+    system_prompt: str,
+    model: str | None = None,
+    language: str | None = None,
+) -> str:
     """Rewrite a full tutor reply into a short structured summary."""
     chosen = model or OLLAMA_MODEL
+    lang_line = (
+        f" Write the summary entirely in {language}."
+        if language
+        else " Keep the same language as the original reply."
+    )
     messages = [
         {"role": "system", "content": system_prompt},
         {
             "role": "user",
             "content": (
                 "Rewrite the following tutor reply into a short study summary "
-                "following your rules.\n\n"
+                f"following your rules.{lang_line}\n\n"
                 f"{full_reply.strip()}"
             ),
         },

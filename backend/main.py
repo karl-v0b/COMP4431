@@ -1,24 +1,18 @@
-"""Local FastAPI app: chat UI, Ollama tutor, PDF RAG, quizzes, and learning modes."""
+"""Local FastAPI app for the AI Tutor (chat, summary, modal quiz, learning modes)."""
 
 from __future__ import annotations
 
 import json
 import re
-import tempfile
 from collections.abc import AsyncIterator
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from backend.ollama_client import OllamaError, chat, health, summarize
-from backend.quiz import router as quiz_router
-from backend.rag.config import MAX_FILE_BYTES
-from backend.rag.ingest import IngestError, clear_documents, ingest_pdf, list_documents
-from backend.rag.retrieve import retrieve_for_query
-from backend.rag.store import get_status, has_documents
 from backend.summary_util import is_already_short, load_summary_prompt
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -26,26 +20,10 @@ FRONTEND_DIR = ROOT / "frontend"
 PROMPT_PATH = Path(__file__).resolve().parent / "prompts" / "tutor_system.txt"
 
 app = FastAPI(title="AI Tutor", docs_url=None, redoc_url=None)
-app.include_router(quiz_router)
 
 
 def load_system_prompt() -> str:
     return PROMPT_PATH.read_text(encoding="utf-8").strip()
-
-
-def build_system_prompt(rag_context: str) -> str:
-    base = load_system_prompt()
-    if not rag_context.strip():
-        return base
-    return (
-        f"{base}\n\n"
-        "Uploaded PDF reference context (server-lifetime RAG):\n"
-        "Use this context when it helps answer the user. Prefer it for questions about "
-        "the uploaded material. Cite pages like (p. 3) when you use it. "
-        "If the answer is not in the context, say so and you may still use general "
-        "course knowledge when appropriate.\n\n"
-        f"{rag_context}"
-    )
 
 
 class ChatMessage(BaseModel):
@@ -60,19 +38,13 @@ class ChatRequest(BaseModel):
     language: str = Field(default="English")
 
 
-class ChatResponse(BaseModel):
-    reply: str
-    summary: str | None = None
-    sources: list[str] = Field(default_factory=list)
-
-
-class QuickQuizRequest(BaseModel):
+class QuizRequest(BaseModel):
     topic: str = Field(..., min_length=1)
     scope: str = Field(default="Big Picture")
     language: str = Field(default="English")
 
 
-# Domain restriction word list (off-topic guardrails from test-feature).
+# Domain restriction word list (test-feature guardrails).
 OFF_TOPIC_KEYWORDS = [
     "cake",
     "recipe",
@@ -96,61 +68,7 @@ def is_off_topic(text: str) -> bool:
 
 @app.get("/api/health")
 async def api_health():
-    data = await health()
-    data["rag"] = {
-        "documents": list_documents(),
-        "has_documents": has_documents(),
-        "ingest": get_status(),
-    }
-    return data
-
-
-@app.get("/api/documents")
-async def api_list_documents():
-    return {"documents": list_documents(), "ingest": get_status()}
-
-
-@app.delete("/api/documents")
-async def api_clear_documents():
-    clear_documents()
-    return {"ok": True, "documents": [], "ingest": get_status()}
-
-
-@app.post("/api/upload")
-async def api_upload(file: UploadFile = File(...)):
-    filename = Path(file.filename or "upload.pdf").name
-    if not filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
-
-    data = await file.read()
-    if not data:
-        raise HTTPException(status_code=400, detail="Empty file.")
-    if len(data) > MAX_FILE_BYTES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File too large. Max size is {MAX_FILE_BYTES // (1024 * 1024)}MB.",
-        )
-
-    tmp_path: Path | None = None
-    try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-            tmp.write(data)
-            tmp_path = Path(tmp.name)
-        result = ingest_pdf(tmp_path, filename)
-    except IngestError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Ingest failed: {exc}") from exc
-    finally:
-        if tmp_path is not None:
-            tmp_path.unlink(missing_ok=True)
-
-    return {
-        "ok": True,
-        "document": result,
-        "documents": list_documents(),
-        "ingest": get_status(),
-    }
+    return await health()
 
 
 def _ndjson(payload: dict) -> bytes:
@@ -178,40 +96,17 @@ async def api_chat(body: ChatRequest):
                     "抱歉，我是 COMP4431 AI 導師，只能協助計算機科學、人工智慧和演算法相關的問題。"
                     "讓我們回到學習吧！"
                 )
-            yield _ndjson(
-                {"type": "result", "reply": refusal, "summary": None, "sources": []}
-            )
+            yield _ndjson({"type": "result", "reply": refusal, "summary": None})
             return
 
-        rag_context = ""
-        sources: list[str] = []
-
-        if has_documents():
-            yield _ndjson(
-                {
-                    "type": "stage",
-                    "stage": "retrieve",
-                    "label": "Retrieving notes",
-                }
-            )
-            try:
-                rag_context, sources = retrieve_for_query(question)
-            except Exception as exc:
-                yield _ndjson(
-                    {"type": "error", "detail": f"RAG retrieval failed: {exc}"}
-                )
-                return
-
-        yield _ndjson(
-            {"type": "stage", "stage": "write", "label": "Writing answer"}
-        )
+        yield _ndjson({"type": "stage", "stage": "write", "label": "Writing answer"})
 
         mode_instruction = f"CRITICAL: You must strictly follow [MODE: {body.level}].\n"
         lang_instruction = f"CRITICAL: You must reply entirely in {body.language}.\n\n"
         user_content = f"{mode_instruction}{lang_instruction}Question: {question}"
 
         messages: list[dict[str, str]] = [
-            {"role": "system", "content": build_system_prompt(rag_context)},
+            {"role": "system", "content": load_system_prompt()},
             *[m.model_dump() for m in trimmed],
             {"role": "user", "content": user_content},
         ]
@@ -231,20 +126,17 @@ async def api_chat(body: ChatRequest):
                 }
             )
             try:
-                summary = await summarize(reply, load_summary_prompt())
+                summary = await summarize(
+                    reply,
+                    load_summary_prompt(body.language),
+                    language=body.language,
+                )
             except OllamaError:
                 summary = None
             if summary and summary.strip() == reply.strip():
                 summary = None
 
-        yield _ndjson(
-            {
-                "type": "result",
-                "reply": reply,
-                "summary": summary,
-                "sources": sources,
-            }
-        )
+        yield _ndjson({"type": "result", "reply": reply, "summary": summary})
 
     return StreamingResponse(
         event_stream(),
@@ -256,9 +148,9 @@ async def api_chat(body: ChatRequest):
     )
 
 
-@app.post("/api/quick-quiz")
-async def api_quick_quiz(body: QuickQuizRequest):
-    """Topic/scope quiz without PDF grounding (from test-feature modal)."""
+@app.post("/api/quiz")
+async def api_quiz(body: QuizRequest):
+    """Modal quiz: topic/scope/language, no PDF grounding."""
     if is_off_topic(body.topic):
         raise HTTPException(
             status_code=400, detail="Topic is outside the Computer Science domain."
@@ -331,6 +223,8 @@ async def api_quick_quiz(body: QuickQuizRequest):
         if not isinstance(data, list) or len(data) != 3:
             raise ValueError("Expected a list of exactly 3 questions.")
         return {"questions": data}
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(
             status_code=500,
