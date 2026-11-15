@@ -599,7 +599,7 @@
     {
       terms: ["rag", "retrieval-augmented generation", "retrieval augmented generation"],
       display: "Retrieval-Augmented Generation (RAG)",
-      def: "RAG retrieves relevant documents and feeds them into the model as context for answering. This tutor uses RAG for uploaded lecture PDFs. Chunk quality and retrieval strongly affect answers.",
+      def: "RAG retrieves relevant documents and feeds them into the model as context for answering. Chunk quality and retrieval strongly affect answer quality in RAG systems.",
     },
     {
       terms: ["prompt", "prompts", "system prompt"],

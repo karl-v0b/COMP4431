@@ -9,8 +9,14 @@ SHORT_REPLY_MAX_LINES = 3
 SHORT_REPLY_MAX_WORDS = 40
 
 
-def load_summary_prompt() -> str:
-    return SUMMARY_PROMPT_PATH.read_text(encoding="utf-8").strip()
+def load_summary_prompt(language: str | None = None) -> str:
+    base = SUMMARY_PROMPT_PATH.read_text(encoding="utf-8").strip()
+    if not language:
+        return base
+    return (
+        f"{base}\n\n"
+        f"CRITICAL: Write the entire summary in {language}, matching the tutor reply language."
+    )
 
 
 def is_already_short(reply: str) -> bool:

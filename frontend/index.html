@@ -3,65 +3,90 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AI Tutor</title>
+    <title>COMP4431 AI Tutor</title>
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
     <main class="app">
       <header class="header">
-        <h1>AI Tutor</h1>
-        <p id="status" class="status" hidden></p>
+        <div class="header-brand">
+          <div id="avatar-fallback" class="avatar" aria-hidden="true">🤖</div>
+          <div>
+            <h1>COMP4431 AI Tutor</h1>
+            <p id="status" class="status" hidden></p>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <button id="break-btn" type="button" class="btn btn-warn">Remind Me</button>
+          <button id="open-quiz-btn" type="button" class="btn btn-success">Generate Quiz</button>
+        </div>
       </header>
 
-      <nav class="mode-switch" aria-label="Tutor mode">
-        <button id="chat-mode" type="button" aria-pressed="true">Chat</button>
-        <button id="quiz-mode" type="button" aria-pressed="false">Quiz</button>
-      </nav>
-      <section id="quiz-panel" hidden aria-label="Lecture quiz">
-        <h2>Test your understanding</h2>
-        <p>Upload lecture PDFs below, then choose a topic. Questions use retrieved passages, not the entire course.</p>
-        <form id="quiz-settings">
-          <label>Topic <input id="quiz-topic" required maxlength="200" placeholder="e.g. breadth-first search"></label>
-          <div class="quiz-controls">
-            <label>Questions <select id="quiz-count"><option>1</option><option selected>3</option><option>5</option></select></label>
-            <label>Difficulty <select id="quiz-difficulty"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option></select></label>
-            <label>Language <select id="quiz-language"><option>English</option><option>Traditional Chinese</option></select></label>
-          </div>
-          <button type="submit">Generate quiz</button>
-        </form>
-        <p id="quiz-status" role="status" aria-live="polite"></p>
-        <form id="quiz-answers" hidden></form>
-        <p class="quiz-note">AI-generated questions and answer keys can contain mistakes. Review the supporting passages. Quizzes expire after one hour or a server restart.</p>
-      </section>
       <section id="messages" class="messages" aria-live="polite"></section>
 
-      <section class="docs" aria-label="PDF references">
-        <div class="docs-row">
-          <label class="upload-label">
-            Upload PDF
-            <input id="pdf-input" type="file" accept="application/pdf,.pdf" hidden />
-          </label>
-          <button id="clear-docs" type="button">Clear PDF</button>
+      <div class="settings-bar">
+        <div class="settings-field">
+          <label for="language-select">Language</label>
+          <select id="language-select">
+            <option value="English">English</option>
+            <option value="Traditional Chinese">中文 (Traditional Chinese)</option>
+          </select>
         </div>
-        <p id="ingest-status" class="ingest-status"></p>
-        <ul id="doc-list" class="doc-list"></ul>
-      </section>
+        <div class="settings-field">
+          <label for="learning-mode">Mode</label>
+          <select id="learning-mode">
+            <option value="Standard">Standard</option>
+            <option value="ELI5">ELI5 (Explain Like I'm 5)</option>
+            <option value="Deep Dive">Deep Dive (Technical)</option>
+            <option value="Exam Prep">Exam Prep</option>
+          </select>
+        </div>
+        <button id="mute-btn" type="button" class="btn btn-ghost mute-btn">Audio ON</button>
+      </div>
 
       <form id="chat-form" class="composer">
         <textarea
           id="input"
           rows="2"
-          placeholder="Ask any question"
+          placeholder="Ask any question about AI, Neural Networks, or Algorithms..."
           required
         ></textarea>
         <button id="send" type="submit">Send</button>
       </form>
     </main>
-    <script src="/static/marked.min.js?v=4"></script>
-    <script src="/static/glossary.js?v=4"></script>
-    <script src="/static/glossary_match.js?v=4"></script>
-    <script src="/static/app.js?v=4"></script>
-    <script src="/static/quiz.js?v=4"></script>
-    <script src="/static/fastcheck.js?v=4"></script>
+
+    <div id="toast-container" class="toast-container"></div>
+
+    <div id="quiz-modal" class="modal-overlay">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Generate a Quiz</h3>
+          <button id="close-quiz-btn" class="close-btn" type="button" aria-label="Close">&times;</button>
+        </div>
+
+        <div class="quiz-controls">
+          <input type="text" id="quiz-topic" placeholder="Topic (e.g., Networking)" />
+          <select id="quiz-scope">
+            <option value="Big Picture">Big Picture</option>
+            <option value="In-Depth">In-Depth</option>
+            <option value="Very Specific">Very Specific</option>
+          </select>
+          <select id="quiz-language">
+            <option value="English">English</option>
+            <option value="Traditional Chinese">中文 (Traditional)</option>
+          </select>
+          <button id="quiz-btn" type="button" class="btn btn-primary">Generate</button>
+        </div>
+
+        <div id="quiz-result" class="quiz-result"></div>
+      </div>
+    </div>
+
+    <script src="/static/marked.min.js?v=5"></script>
+    <script src="/static/glossary.js?v=5"></script>
+    <script src="/static/glossary_match.js?v=5"></script>
+    <script src="/static/app.js?v=5"></script>
+    <script src="/static/fastcheck.js?v=5"></script>
   </body>
 </html>

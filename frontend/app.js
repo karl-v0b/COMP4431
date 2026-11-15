@@ -4,21 +4,109 @@
   const inputEl = document.getElementById("input");
   const sendEl = document.getElementById("send");
   const statusEl = document.getElementById("status");
-  const pdfInputEl = document.getElementById("pdf-input");
-  const clearDocsEl = document.getElementById("clear-docs");
-  const ingestStatusEl = document.getElementById("ingest-status");
-  const docListEl = document.getElementById("doc-list");
 
-  /** @type {{role: string, content: string}[]} */
+  const modeSelectorEl = document.getElementById("learning-mode");
+  const langSelectorEl = document.getElementById("language-select");
+  const emojiFallback = document.getElementById("avatar-fallback");
+  const muteBtnEl = document.getElementById("mute-btn");
+
+  const openQuizBtn = document.getElementById("open-quiz-btn");
+  const closeQuizBtn = document.getElementById("close-quiz-btn");
+  const quizModal = document.getElementById("quiz-modal");
+  const quizTopicEl = document.getElementById("quiz-topic");
+  const quizScopeEl = document.getElementById("quiz-scope");
+  const quizLanguageEl = document.getElementById("quiz-language");
+  const quizBtnEl = document.getElementById("quiz-btn");
+  const quizResultEl = document.getElementById("quiz-result");
+
+  const breakBtnEl = document.getElementById("break-btn");
+  const toastContainer = document.getElementById("toast-container");
+
   const history = [];
   const MAX_HISTORY = 12;
   let thinkingEl = null;
+  let isMuted = false;
 
   if (window.marked && typeof marked.setOptions === "function") {
-    marked.setOptions({
-      gfm: true,
-      breaks: true,
-    });
+    marked.setOptions({ gfm: true, breaks: true });
+  }
+
+  const selfCareMessages = [
+    {
+      title: "Time for a sip of water",
+      text: "Staying hydrated helps your brain process those neural networks better. Take a quick sip.",
+    },
+    {
+      title: "Rest your eyes",
+      text: "You've been staring at the screen for a while. Look 20 feet away for 20 seconds to reduce eye strain.",
+    },
+    {
+      title: "Quick stretch",
+      text: "Roll your shoulders back and take a deep breath. A relaxed mind learns faster.",
+    },
+    {
+      title: "Healthy snack time",
+      text: "Doing deep dives burns calories. Maybe grab a quick healthy snack before the next topic?",
+    },
+  ];
+
+  function showToast() {
+    const msg = selfCareMessages[Math.floor(Math.random() * selfCareMessages.length)];
+    const toast = document.createElement("div");
+    toast.className = "custom-toast";
+    toast.innerHTML = `
+      <div class="toast-content">
+        <h4>${msg.title}</h4>
+        <p>${msg.text}</p>
+      </div>
+    `;
+    toastContainer.appendChild(toast);
+    setTimeout(() => {
+      toast.classList.add("hiding");
+      setTimeout(() => toast.remove(), 300);
+    }, 6000);
+  }
+
+  breakBtnEl.addEventListener("click", showToast);
+  setInterval(showToast, 900000);
+
+  openQuizBtn.addEventListener("click", () => {
+    quizModal.classList.add("active");
+    quizTopicEl.focus();
+  });
+
+  closeQuizBtn.addEventListener("click", () => {
+    quizModal.classList.remove("active");
+  });
+
+  quizModal.addEventListener("click", (e) => {
+    if (e.target === quizModal) quizModal.classList.remove("active");
+  });
+
+  muteBtnEl.addEventListener("click", () => {
+    isMuted = !isMuted;
+    if (isMuted) {
+      muteBtnEl.textContent = "Audio OFF";
+      muteBtnEl.classList.add("is-muted");
+      window.speechSynthesis.cancel();
+    } else {
+      muteBtnEl.textContent = "Audio ON";
+      muteBtnEl.classList.remove("is-muted");
+    }
+  });
+
+  function setAvatar(state) {
+    if (!emojiFallback) return;
+    if (state === "thinking") {
+      emojiFallback.textContent = "🤔";
+      emojiFallback.style.animation = "pulse 1s infinite";
+    } else if (state === "speaking") {
+      emojiFallback.textContent = "🗣️";
+      emojiFallback.style.animation = "bounce 0.5s infinite";
+    } else {
+      emojiFallback.textContent = "🤖";
+      emojiFallback.style.animation = "none";
+    }
   }
 
   function renderContent(bodyEl, role, content) {
@@ -91,45 +179,18 @@
     actionsEl.appendChild(btn);
   }
 
-  function formatSourcesLabel(sources) {
-    const names = (sources || []).filter(Boolean);
-    if (!names.length) return "";
-    if (names.length === 1) return `PDF: ${names[0]}`;
-    return `PDF: ${names.join(", ")}`;
-  }
-
-  function addSourcesLabel(wrap, sources) {
-    const label = formatSourcesLabel(sources);
-    if (!label) return;
-    let refEl = wrap.querySelector(".pdf-ref");
-    if (!refEl) {
-      refEl = document.createElement("div");
-      refEl.className = "pdf-ref";
-      const body = wrap.querySelector(".body");
-      if (body && body.nextSibling) {
-        wrap.insertBefore(refEl, body.nextSibling);
-      } else {
-        wrap.appendChild(refEl);
-      }
-    }
-    refEl.textContent = label;
-  }
-
-  function appendMessage(role, content, className, sources, summary) {
+  function appendMessage(role, content, className, summary) {
     const wrap = document.createElement("div");
     wrap.className = `message ${className || role}`;
-
     const roleEl = document.createElement("span");
     roleEl.className = "role";
     roleEl.textContent = role === "user" ? "You" : role === "assistant" ? "Tutor" : "Error";
-
     const body = document.createElement("div");
     renderContent(body, role, content);
     body.dataset.activeText = content;
 
     wrap.appendChild(roleEl);
     wrap.appendChild(body);
-    addSourcesLabel(wrap, sources);
 
     if (role === "assistant") {
       const actions = document.createElement("div");
@@ -146,24 +207,21 @@
 
   function showThinking(label) {
     hideThinking();
+    setAvatar("thinking");
     const wrap = document.createElement("div");
     wrap.className = "message assistant thinking";
     wrap.id = "thinking-message";
-
     const roleEl = document.createElement("span");
     roleEl.className = "role";
     roleEl.textContent = "Tutor";
-
     const body = document.createElement("div");
     body.className = "body thinking-body";
-    const labelText = label || "Working";
     body.innerHTML =
       '<span class="thinking-label"></span>' +
       '<span class="thinking-dots" aria-hidden="true">' +
-      '<span></span><span></span><span></span>' +
+      "<span></span><span></span><span></span>" +
       "</span>";
-    body.querySelector(".thinking-label").textContent = labelText;
-
+    body.querySelector(".thinking-label").textContent = label || "Working";
     wrap.appendChild(roleEl);
     wrap.appendChild(body);
     messagesEl.appendChild(wrap);
@@ -179,6 +237,7 @@
   }
 
   function hideThinking() {
+    setAvatar("idle");
     if (thinkingEl && thinkingEl.parentNode) {
       thinkingEl.parentNode.removeChild(thinkingEl);
     }
@@ -269,7 +328,6 @@
       }
     }
 
-    // Fallback: classic single JSON body (non-stream / buffered responses)
     if (!state.result || typeof state.result.reply !== "string") {
       try {
         applyChatEvent(JSON.parse(raw.trim()), state);
@@ -279,7 +337,9 @@
     }
 
     if (!state.result || typeof state.result.reply !== "string") {
-      throw new Error("The server did not return a complete answer. Hard-refresh the page (Cmd+Shift+R) and try again.");
+      throw new Error(
+        "The server did not return a complete answer. Hard-refresh the page and try again."
+      );
     }
     return state.result;
   }
@@ -287,57 +347,19 @@
   function setBusy(busy) {
     sendEl.disabled = busy;
     inputEl.disabled = busy;
-    pdfInputEl.disabled = busy;
-    clearDocsEl.disabled = busy;
+    quizBtnEl.disabled = busy;
   }
 
-  function setPdfStatus(text, isError) {
-    ingestStatusEl.textContent = text || "";
-    ingestStatusEl.className = isError ? "ingest-status error" : "ingest-status";
-  }
-
-  function renderDocuments(documents, options) {
-    const opts = options || {};
-    const docs = documents || [];
-    const count = docs.length;
-
-    docListEl.innerHTML = "";
-    if (!count) {
-      const li = document.createElement("li");
-      li.textContent = "No PDF Loaded";
-      docListEl.appendChild(li);
-    } else {
-      for (const doc of docs) {
-        const li = document.createElement("li");
-        li.textContent = `${doc.filename} Loaded`;
-        docListEl.appendChild(li);
-      }
-    }
-
-    if (opts.statusText != null) {
-      setPdfStatus(opts.statusText, !!opts.isError);
-      return;
-    }
-
-    if (opts.ingest && opts.ingest.stage === "error") {
-      setPdfStatus(opts.ingest.detail || "Upload failed.", true);
-      return;
-    }
-
-    if (count === 0) {
-      setPdfStatus("", false);
-    } else {
-      setPdfStatus(`${count} PDF is Loaded`, false);
-    }
-  }
-
-  async function refreshDocuments() {
-    try {
-      const res = await fetch("/api/documents");
-      const data = await res.json();
-      renderDocuments(data.documents || [], { ingest: data.ingest });
-    } catch {
-      setPdfStatus("Could not load PDF list.", true);
+  function speakReply(text, lang) {
+    if (isMuted) return;
+    if ("speechSynthesis" in window) {
+      setAvatar("speaking");
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text.replace(/[*#_`]/g, ""));
+      utterance.lang = lang === "Traditional Chinese" ? "zh-TW" : "en-US";
+      utterance.onend = () => setAvatar("idle");
+      utterance.onerror = () => setAvatar("idle");
+      window.speechSynthesis.speak(utterance);
     }
   }
 
@@ -345,7 +367,6 @@
     try {
       const res = await fetch("/api/health");
       const data = await res.json();
-      // Keep header quiet for normal use; only surface failures.
       if (data.ok) {
         statusEl.textContent = "";
         statusEl.hidden = true;
@@ -355,9 +376,6 @@
         statusEl.textContent = data.detail || "Model not ready.";
         statusEl.className = "status error";
       }
-      if (data.rag) {
-        renderDocuments(data.rag.documents || [], { ingest: data.rag.ingest });
-      }
     } catch {
       statusEl.hidden = false;
       statusEl.textContent = "Cannot reach local server.";
@@ -365,61 +383,15 @@
     }
   }
 
-  pdfInputEl.addEventListener("change", async () => {
-    const file = pdfInputEl.files && pdfInputEl.files[0];
-    pdfInputEl.value = "";
-    if (!file) return;
-
-    setBusy(true);
-    setPdfStatus("Loading PDF…", false);
-
-    const body = new FormData();
-    body.append("file", file, file.name);
-
-    try {
-      const res = await fetch("/api/upload", { method: "POST", body });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const detail = data.detail || `Upload failed (${res.status})`;
-        setPdfStatus(detail, true);
-        await refreshDocuments();
-        return;
-      }
-      const docs = data.documents || [];
-      renderDocuments(docs, {
-        statusText: `${docs.length} PDF is Loaded`,
-      });
-    } catch {
-      setPdfStatus("Upload failed.", true);
-    } finally {
-      setBusy(false);
-      inputEl.focus();
-    }
-  });
-
-  clearDocsEl.addEventListener("click", async () => {
-    setBusy(true);
-    try {
-      const res = await fetch("/api/documents", { method: "DELETE" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setPdfStatus(data.detail || "Could not clear PDF.", true);
-        return;
-      }
-      renderDocuments([], { statusText: "All PDF is Cleared" });
-    } catch {
-      setPdfStatus("Could not clear PDF.", true);
-    } finally {
-      setBusy(false);
-    }
-  });
-
   formEl.addEventListener("submit", async (event) => {
     event.preventDefault();
     const message = inputEl.value.trim();
     if (!message) return;
 
-    const userMsgEl = appendMessage("user", message);
+    const selectedMode = modeSelectorEl ? modeSelectorEl.value : "Standard";
+    const selectedLang = langSelectorEl ? langSelectorEl.value : "English";
+
+    appendMessage("user", message);
     inputEl.value = "";
     setBusy(true);
     showThinking("Working");
@@ -433,6 +405,8 @@
         },
         body: JSON.stringify({
           message,
+          level: selectedMode,
+          language: selectedLang,
           history: history.slice(-MAX_HISTORY),
         }),
       });
@@ -453,13 +427,12 @@
 
       const reply = data.reply || "";
       const summary = data.summary || null;
-      const sources = data.sources || [];
       if (!reply) {
         appendMessage("error", "The tutor returned an empty answer. Please try again.", "error");
         return;
       }
-      addSourcesLabel(userMsgEl, sources);
-      appendMessage("assistant", reply, "assistant", sources, summary);
+      appendMessage("assistant", reply, "assistant", summary);
+      speakReply(reply, selectedLang);
       history.push({ role: "user", content: message });
       history.push({ role: "assistant", content: reply });
       if (history.length > MAX_HISTORY) {
@@ -468,13 +441,86 @@
     } catch (err) {
       hideThinking();
       const msg = err && typeof err.message === "string" ? err.message : "";
-      const detail = msg && !/fetch|network|Failed to fetch/i.test(msg)
-        ? msg
-        : "Could not reach the local server. Is the app still running?";
+      const detail =
+        msg && !/fetch|network|Failed to fetch/i.test(msg)
+          ? msg
+          : "Could not reach the local server. Is the app still running?";
       appendMessage("error", detail, "error");
     } finally {
       setBusy(false);
       inputEl.focus();
+    }
+  });
+
+  quizBtnEl.addEventListener("click", async () => {
+    const topic = quizTopicEl.value.trim();
+    if (!topic) {
+      alert("Please enter a topic first.");
+      return;
+    }
+    const scope = quizScopeEl.value;
+    const lang = quizLanguageEl ? quizLanguageEl.value : "English";
+
+    setBusy(true);
+    quizResultEl.innerHTML = "<p>Generating 3 questions...</p>";
+    setAvatar("thinking");
+
+    try {
+      const res = await fetch("/api/quiz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic, scope, language: lang }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      setAvatar("idle");
+
+      if (!res.ok) {
+        quizResultEl.innerHTML = `<p class="quiz-error">Error: ${
+          data.detail || "Failed to generate quiz."
+        }</p>`;
+        return;
+      }
+
+      quizResultEl.innerHTML = "";
+      data.questions.forEach((q, idx) => {
+        const qDiv = document.createElement("div");
+        qDiv.className = "quiz-question";
+
+        const qTitle = document.createElement("h4");
+        qTitle.textContent = `Q${idx + 1}: ${q.question}`;
+        qDiv.appendChild(qTitle);
+
+        q.options.forEach((opt) => {
+          const optDiv = document.createElement("div");
+          optDiv.className = "quiz-option-row";
+          optDiv.textContent = opt;
+          qDiv.appendChild(optDiv);
+        });
+
+        const answerBtn = document.createElement("button");
+        answerBtn.className = "quiz-answer-btn";
+        answerBtn.textContent = "Show Answer";
+        const answerDiv = document.createElement("div");
+        answerDiv.className = "quiz-answer-text";
+        const correctLetter = String.fromCharCode(65 + q.correct_index);
+        answerDiv.innerHTML = `<strong>Correct Answer: ${correctLetter}</strong><br>${q.explanation}`;
+
+        answerBtn.addEventListener("click", () => {
+          const isVisible = answerDiv.style.display === "block";
+          answerDiv.style.display = isVisible ? "none" : "block";
+          answerBtn.textContent = isVisible ? "Show Answer" : "Hide Answer";
+        });
+
+        qDiv.appendChild(answerBtn);
+        qDiv.appendChild(answerDiv);
+        quizResultEl.appendChild(qDiv);
+      });
+    } catch {
+      setAvatar("idle");
+      quizResultEl.innerHTML = `<p class="quiz-error">Could not reach server.</p>`;
+    } finally {
+      setBusy(false);
     }
   });
 
@@ -485,7 +531,7 @@
     }
   });
 
+  setAvatar("idle");
   refreshHealth();
-  refreshDocuments();
   inputEl.focus();
 })();

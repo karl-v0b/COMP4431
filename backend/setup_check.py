@@ -18,21 +18,13 @@ REQUIREMENTS = ROOT / "requirements.txt"
 
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
 CHAT_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
-EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
-VISION_MODEL = os.getenv("OLLAMA_VISION_MODEL", "moondream")
 
-REQUIRED_MODELS = (CHAT_MODEL, EMBED_MODEL, VISION_MODEL)
+REQUIRED_MODELS = (CHAT_MODEL,)
 
 REQUIRED_IMPORTS: list[tuple[str, str]] = [
     ("fastapi", "fastapi"),
     ("uvicorn", "uvicorn"),
     ("httpx", "httpx"),
-    ("multipart", "python-multipart"),
-    ("pymupdf", "pymupdf"),
-    ("langchain", "langchain"),
-    ("langchain_community", "langchain-community"),
-    ("langchain_ollama", "langchain-ollama"),
-    ("langchain_text_splitters", "langchain-text-splitters"),
 ]
 
 
