@@ -18,6 +18,8 @@
         </div>
 
         <div class="header-actions">
+          <button id="new-chat-btn" type="button" class="btn btn-ghost">New chat</button>
+          <button id="open-history-btn" type="button" class="btn btn-ghost">History</button>
           <button id="break-btn" type="button" class="btn btn-warn">Remind Me</button>
           <button id="open-quiz-btn" type="button" class="btn btn-success">Generate Quiz</button>
         </div>
@@ -80,6 +82,25 @@
         </div>
 
         <div id="quiz-result" class="quiz-result"></div>
+      </div>
+    </div>
+
+    <div id="history-modal" class="modal-overlay">
+      <div class="modal-content history-modal-content">
+        <div class="modal-header">
+          <div class="history-header-left">
+            <button id="history-back-btn" class="history-back-btn" type="button" hidden>Back</button>
+            <h3 id="history-modal-title">Chat History</h3>
+          </div>
+          <button id="close-history-btn" class="close-btn" type="button" aria-label="Close">&times;</button>
+        </div>
+
+        <div id="history-list-view" class="history-view">
+          <div id="history-list" class="history-list"></div>
+        </div>
+        <div id="history-detail-view" class="history-view" hidden>
+          <div id="history-detail-messages" class="history-detail-messages messages"></div>
+        </div>
       </div>
     </div>
 
