@@ -8,7 +8,6 @@
   </head>
   <body>
     <main class="app">
-      
       <header class="header" style="display: flex; align-items: center; gap: 20px; margin-bottom: 20px; justify-content: space-between;">
         <div style="display: flex; align-items: center; gap: 20px;">
           <div id="avatar-fallback" style="display: flex; width: 100px; height: 100px; background: #e0e7ff; border-radius: 50%; border: 4px solid #4f46e5; font-size: 3rem; transition: all 0.3s; align-items: center; justify-content: center;">🤖</div>
@@ -17,13 +16,34 @@
             <p id="status" class="status" hidden style="margin: 0;"></p>
           </div>
         </div>
-        
+
         <div style="display: flex; gap: 10px;">
-          <!-- NEW: Break Reminder Button -->
-          <button id="break-btn" style="padding: 10px 20px; background: #f59e0b; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">☕ Remind Me</button>
-          <button id="open-quiz-btn" style="padding: 10px 20px; background: #10b981; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">📝 Generate Quiz</button>
+          <button id="break-btn" type="button" style="padding: 10px 20px; background: #f59e0b; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">☕ Remind Me</button>
+          <button id="open-quick-quiz-btn" type="button" style="padding: 10px 20px; background: #10b981; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">📝 Quick Quiz</button>
         </div>
       </header>
+
+      <nav class="mode-switch" aria-label="Tutor mode">
+        <button id="chat-mode" type="button" aria-pressed="true">Chat</button>
+        <button id="quiz-mode" type="button" aria-pressed="false">Lecture Quiz</button>
+      </nav>
+
+      <section id="quiz-panel" hidden aria-label="Lecture quiz">
+        <h2>Test your understanding</h2>
+        <p>Upload lecture PDFs below, then choose a topic. Questions use retrieved passages, not the entire course.</p>
+        <form id="quiz-settings">
+          <label>Topic <input id="quiz-topic" required maxlength="200" placeholder="e.g. breadth-first search"></label>
+          <div class="quiz-controls">
+            <label>Questions <select id="quiz-count"><option>1</option><option selected>3</option><option>5</option></select></label>
+            <label>Difficulty <select id="quiz-difficulty"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option></select></label>
+            <label>Language <select id="quiz-language"><option>English</option><option>Traditional Chinese</option></select></label>
+          </div>
+          <button type="submit">Generate quiz</button>
+        </form>
+        <p id="quiz-status" role="status" aria-live="polite"></p>
+        <form id="quiz-answers" hidden></form>
+        <p class="quiz-note">AI-generated questions and answer keys can contain mistakes. Review the supporting passages. Quizzes expire after one hour or a server restart.</p>
+      </section>
 
       <section id="messages" class="messages" aria-live="polite"></section>
 
@@ -47,43 +67,56 @@
         <button id="mute-btn" type="button" style="margin-left: auto; padding: 6px 12px; cursor: pointer; border: 1px solid #ccc; background: white; border-radius: 4px; font-weight: bold;">🔊 Audio ON</button>
       </div>
 
+      <section class="docs" aria-label="PDF references">
+        <div class="docs-row">
+          <label class="upload-label">
+            Upload PDF
+            <input id="pdf-input" type="file" accept="application/pdf,.pdf" hidden />
+          </label>
+          <button id="clear-docs" type="button">Clear PDF</button>
+        </div>
+        <p id="ingest-status" class="ingest-status"></p>
+        <ul id="doc-list" class="doc-list"></ul>
+      </section>
+
       <form id="chat-form" class="composer">
         <textarea id="input" rows="2" placeholder="Ask any question about AI, Neural Networks, or Algorithms..." required></textarea>
         <button id="send" type="submit">Send</button>
       </form>
-
     </main>
 
-    <!-- Toast Container -->
     <div id="toast-container" class="toast-container"></div>
 
-    <!-- Quiz Modal -->
-    <div id="quiz-modal" class="modal-overlay">
+    <div id="quick-quiz-modal" class="modal-overlay">
       <div class="modal-content">
         <div class="modal-header">
-          <h3 style="margin: 0;">📝 Generate a Quiz</h3>
-          <button id="close-quiz-btn" class="close-btn">&times;</button>
+          <h3 style="margin: 0;">📝 Generate a Quick Quiz</h3>
+          <button id="close-quick-quiz-btn" class="close-btn" type="button">&times;</button>
         </div>
-        
+
         <div class="quiz-controls">
-          <input type="text" id="quiz-topic" placeholder="Topic (e.g., Networking)" />
-          <select id="quiz-scope">
+          <input type="text" id="quick-quiz-topic" placeholder="Topic (e.g., Networking)" />
+          <select id="quick-quiz-scope">
             <option value="Big Picture">Big Picture</option>
             <option value="In-Depth">In-Depth</option>
             <option value="Very Specific">Very Specific</option>
           </select>
-          <select id="quiz-language">
+          <select id="quick-quiz-language">
             <option value="English">English</option>
             <option value="Traditional Chinese">中文 (Traditional)</option>
           </select>
-          <button id="quiz-btn" type="button">Generate</button>
+          <button id="quick-quiz-btn" type="button">Generate</button>
         </div>
-        
-        <div id="quiz-result" class="quiz-result"></div>
+
+        <div id="quick-quiz-result" class="quiz-result"></div>
       </div>
     </div>
 
-    <script src="/static/marked.min.js"></script>
-    <script src="/static/app.js"></script>
+    <script src="/static/marked.min.js?v=4"></script>
+    <script src="/static/glossary.js?v=4"></script>
+    <script src="/static/glossary_match.js?v=4"></script>
+    <script src="/static/app.js?v=4"></script>
+    <script src="/static/quiz.js?v=4"></script>
+    <script src="/static/fastcheck.js?v=4"></script>
   </body>
 </html>
