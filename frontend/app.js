@@ -664,25 +664,4 @@
   setAvatar("idle");
   refreshHealth();
   inputEl.focus();
-
-  // Test hook (used by tests/test_history.py)
-  window.__HISTORY_TEST__ = {
-    getChatTitle,
-    saveCurrentChatIfNeeded,
-    resetChat,
-    renderHistoryList,
-    renderHistoryDetail,
-    chatSessions,
-    getCurrentMessages: () => currentMessages,
-    getHistory: () => history,
-    getEls: () => ({
-      messagesEl,
-      historyListEl,
-      historyDetailMessagesEl,
-      historyModalTitle,
-      historyBackBtn,
-      historyListView,
-      historyDetailView,
-    }),
-  };
 })();
