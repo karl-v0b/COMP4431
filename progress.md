@@ -167,3 +167,9 @@ Serves the chat UI (`frontend/index.html`). Static assets are under `/static/...
 - Client-side longest-match glossary lookup (instant).
 - Files: `frontend/glossary.js`, `frontend/glossary_match.js`, `frontend/fastcheck.js`.
 - Tests: `tests/test_fastcheck.py`.
+
+## Modal History
+
+- New chat button added. Press to add current chat to history modal.
+- In-memory non-persistence chat history.
+- Implemented modal UI in `frontend/index.html` / `app.js`.

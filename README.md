@@ -12,6 +12,7 @@ Local, offline AI course tutor chatbot. No cloud API keys. Runs on your machine 
 - **Fast Check:** highlight words in a tutor reply to identify a course term (local glossary; no model call)
 - Modal quiz generator (`/api/quiz`) by topic / scope / language
 - Avatar, mute toggle, and break reminders
+- Modal chat history
 
 ## Hardware note
 

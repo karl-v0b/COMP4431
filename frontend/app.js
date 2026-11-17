@@ -22,10 +22,23 @@
   const breakBtnEl = document.getElementById("break-btn");
   const toastContainer = document.getElementById("toast-container");
 
+  const newChatBtn = document.getElementById("new-chat-btn");
+  const openHistoryBtn = document.getElementById("open-history-btn");
+  const closeHistoryBtn = document.getElementById("close-history-btn");
+  const historyModal = document.getElementById("history-modal");
+  const historyListView = document.getElementById("history-list-view");
+  const historyDetailView = document.getElementById("history-detail-view");
+  const historyListEl = document.getElementById("history-list");
+  const historyDetailMessagesEl = document.getElementById("history-detail-messages");
+  const historyBackBtn = document.getElementById("history-back-btn");
+  const historyModalTitle = document.getElementById("history-modal-title");
+
   const history = [];
   const MAX_HISTORY = 12;
   let thinkingEl = null;
   let isMuted = false;
+  let currentMessages = [];
+  const chatSessions = [];
 
   if (window.marked && typeof marked.setOptions === "function") {
     marked.setOptions({ gfm: true, breaks: true });
@@ -81,6 +94,25 @@
 
   quizModal.addEventListener("click", (e) => {
     if (e.target === quizModal) quizModal.classList.remove("active");
+  });
+
+  openHistoryBtn.addEventListener("click", openHistoryModal);
+
+  closeHistoryBtn.addEventListener("click", closeHistoryModal);
+
+  historyBackBtn.addEventListener("click", () => {
+    showHistoryListView();
+    renderHistoryList();
+  });
+
+  historyModal.addEventListener("click", (e) => {
+    if (e.target === historyModal) closeHistoryModal();
+  });
+
+  newChatBtn.addEventListener("click", () => {
+    saveCurrentChatIfNeeded();
+    resetChat();
+    inputEl.focus();
   });
 
   muteBtnEl.addEventListener("click", () => {
@@ -179,7 +211,7 @@
     actionsEl.appendChild(btn);
   }
 
-  function appendMessage(role, content, className, summary) {
+  function appendMessage(role, content, className, summary, container = messagesEl) {
     const wrap = document.createElement("div");
     wrap.className = `message ${className || role}`;
     const roleEl = document.createElement("span");
@@ -200,9 +232,104 @@
       wrap.appendChild(actions);
     }
 
-    messagesEl.appendChild(wrap);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+    container.appendChild(wrap);
     return wrap;
+  }
+
+  function getChatTitle(messages) {
+    const firstUser = messages.find((m) => m.role === "user");
+    let title = (firstUser && firstUser.content ? firstUser.content : "").replace(/\s+/g, " ").trim();
+    if (!title) return "Untitled chat";
+    return title.length > 60 ? title.slice(0, 60) + " ..." : title;
+  }
+
+  function saveCurrentChatIfNeeded() {
+    const hasAssistantReply = currentMessages.some((m) => m.role === "assistant");
+    if (!hasAssistantReply) return;
+    chatSessions.unshift({
+      id: String(Date.now()) + "-" + Math.random().toString(36).slice(2, 8),
+      createdAt: Date.now(),
+      title: getChatTitle(currentMessages),
+      messages: currentMessages.map((m) => ({
+        role: m.role,
+        content: m.content,
+        summary: m.summary || null,
+      })),
+    });
+  }
+
+  function resetChat() {
+    messagesEl.innerHTML = "";
+    history.length = 0;
+    currentMessages = [];
+    hideThinking();
+    setAvatar("idle");
+    window.speechSynthesis.cancel();
+  }
+
+  function showHistoryListView() {
+    historyModalTitle.textContent = "Chat History";
+    historyBackBtn.hidden = true;
+    historyListView.hidden = false;
+    historyDetailView.hidden = true;
+  }
+
+  function renderHistoryList() {
+    historyListEl.innerHTML = "";
+    if (chatSessions.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "history-empty";
+      empty.textContent = "No past chats yet.";
+      historyListEl.appendChild(empty);
+      return;
+    }
+    chatSessions.forEach((session) => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "history-row";
+
+      const titleEl = document.createElement("span");
+      titleEl.className = "history-row-title";
+      titleEl.textContent = session.title
+
+      const timeEl = document.createElement("span");
+      timeEl.className = "history-row-time";
+      timeEl.textContent = session.createdAt ? new Date(session.createdAt).toLocaleString() : "";
+      
+      row.appendChild(titleEl);
+      row.appendChild(timeEl);
+      row.addEventListener("click", () => openHistoryDetail(session));      
+      historyListEl.appendChild(row);
+    });
+  }
+
+  function renderHistoryDetail(session) {
+    historyDetailMessagesEl.innerHTML = "";
+    session.messages.forEach((m) => {
+      if (m.role === "user") {
+        appendMessage("user", m.content, "user", null, historyDetailMessagesEl);
+      } else if (m.role === "assistant") {
+        appendMessage("assistant", m.content, "assistant", m.summary || null, historyDetailMessagesEl);
+      }
+    });
+  }
+
+  function openHistoryDetail(session) {
+    historyModalTitle.textContent = session.title;
+    historyBackBtn.hidden = false;
+    historyListView.hidden = true;
+    historyDetailView.hidden = false;
+    renderHistoryDetail(session);
+  }
+
+  function openHistoryModal() {
+    showHistoryListView();
+    renderHistoryList();
+    historyModal.classList.add("active");
+  }
+
+  function closeHistoryModal() {
+    historyModal.classList.remove("active");
   }
 
   function showThinking(label) {
@@ -348,6 +475,7 @@
     sendEl.disabled = busy;
     inputEl.disabled = busy;
     quizBtnEl.disabled = busy;
+    if (newChatBtn) newChatBtn.disabled = busy;
   }
 
   function speakReply(text, lang) {
@@ -392,6 +520,7 @@
     const selectedLang = langSelectorEl ? langSelectorEl.value : "English";
 
     appendMessage("user", message);
+    currentMessages.push({ role: "user", content: message });
     inputEl.value = "";
     setBusy(true);
     showThinking("Working");
@@ -432,6 +561,7 @@
         return;
       }
       appendMessage("assistant", reply, "assistant", summary);
+      currentMessages.push({ role: "assistant", content: reply, summary: summary || null });
       speakReply(reply, selectedLang);
       history.push({ role: "user", content: message });
       history.push({ role: "assistant", content: reply });
