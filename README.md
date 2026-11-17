@@ -1,17 +1,15 @@
 # AI Tutor Chatbot (COMP4431 Group Project)
 
 Local, offline AI course tutor chatbot. No cloud API keys. Runs on your machine via Ollama + a small FastAPI app.
+Domain AI/CS tutoring in English or Traditional Chinese with Off-topic guardrails
 
 ## Features
 
-- Domain AI/CS tutoring in English or Traditional Chinese
 - Learning modes: Standard, ELI5, Deep Dive, Exam Prep
-- Off-topic guardrails (keeps the tutor on CS/AI)
-- Markdown tutor replies + Copy button + **Summary / Full** toggle (summary matches chat language)
-- Streaming chat with stage labels (Writing answer → Preparing summary)
-- **Fast Check:** highlight words in a tutor reply to identify a course term (local glossary; no model call)
-- Modal quiz generator (`/api/quiz`) by topic / scope / language
-- Avatar, mute toggle, and break reminders
+- **Summary / Full** toggle: Shorter version of response keeping essential & important key word and their explanation
+- **Fast Check:** highlight words in a tutor reply to identify a course term with short explanation
+- Modal quiz generator by topic / scope / language
+- Avatar, TTS & mute toggle, and break reminders
 - Modal chat history
 
 ## Hardware note
